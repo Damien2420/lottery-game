@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>彈珠台抽獎</title>
+  </head>
+  <body>
+    <div id="app">
+      <aside class="panel">
+        <h1>彈珠台抽獎</h1>
+
+        <label class="field">
+          <span>參加名單（一行一位）<em id="nameCount">0 人</em></span>
+          <textarea id="names" rows="10" spellcheck="false">小明
+小華
+阿美
+大雄
+靜香
+胖虎
+小夫
+阿哲
+小玉
+志明
+春嬌
+阿德</textarea>
+        </label>
+
+        <label class="field inline">
+          <span>抽出名額</span>
+          <input id="winnerCount" type="number" min="1" value="3" />
+        </label>
+
+        <label class="check"><input id="removeWinners" type="checkbox" checked /> 得獎者自動從名單移除</label>
+        <label class="check"><input id="sound" type="checkbox" checked /> 音效</label>
+
+        <button id="start" type="button">開始抽獎</button>
+        <p id="message" class="message"></p>
+
+        <section>
+          <h2>本輪結果</h2>
+          <ol id="results" class="results"></ol>
+        </section>
+
+        <section>
+          <h2>歷史紀錄</h2>
+          <ol id="history" class="history"></ol>
+        </section>
+      </aside>
+
+      <main class="stage">
+        <canvas id="board"></canvas>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
