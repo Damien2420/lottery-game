@@ -1,3 +1,25 @@
+# 相依套件與建置輸出
 node_modules
 dist
+dist-ssr
+*.local
+
+# 記錄檔
+logs
+*.log
+npm-debug.log*
+
+# 環境變數
+.env
+.env.*
+!.env.example
+
+# 編輯器與工具
+.vscode/*
+!.vscode/extensions.json
+.idea
 .claude
+
+# 作業系統
+.DS_Store
+Thumbs.db
