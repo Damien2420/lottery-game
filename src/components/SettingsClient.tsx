@@ -36,7 +36,8 @@ export default function SettingsClient(): React.JSX.Element {
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(url);
+    // 延後釋放，避免部分瀏覽器尚未開始下載就失效
+    setTimeout(() => URL.revokeObjectURL(url), 0);
     setError('');
     setMessage('');
   };

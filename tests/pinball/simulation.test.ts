@@ -1,16 +1,18 @@
 import Matter from 'matter-js';
 import { describe, expect, it } from 'vitest';
+import { BOARD_LIST } from '@/lib/pinball/boards';
 import { NO_PROGRESS_MS, STEP_MS, STUCK_SPEED } from '@/lib/pinball/physics';
 import { orderArrivals, runHeadless, Simulation } from '@/lib/pinball/simulation';
 
 const names = (n: number) => Array.from({ length: n }, (_, i) => `P${i}`);
 
 describe('Simulation', () => {
-  it('同一種子跑兩次得獎者相同', () => {
-    const cfg = { names: names(30), boardId: 'classic' as const, seed: 12345, winnerCount: 5 };
+  it.each(BOARD_LIST)('同一種子跑兩次得獎者與步數相同：$id', ({ id }) => {
+    const cfg = { names: names(30), boardId: id, seed: 12345, winnerCount: 5 };
     const a = runHeadless(cfg), b = runHeadless(cfg);
     expect(a.winners).toHaveLength(5);
     expect(a.winners).toEqual(b.winners);
+    expect(a.steps).toBe(b.steps);
   });
   it('不同種子會產生不同結果', () => {
     const results = [1, 2, 3, 4, 5].map((seed) =>

@@ -88,3 +88,49 @@ describe('Game', () => {
     game.destroy();
   });
 });
+
+describe('Game 音效', () => {
+  const cfg = { names: ['A', 'B'], boardId: 'classic' as const, seed: 1, winnerCount: 1 };
+
+  it('音效關閉時 start 不解鎖，開啟後的下一次 start 才解鎖', () => {
+    const sfx = new Sfx();
+    const unlock = vi.spyOn(sfx, 'unlock').mockImplementation(() => undefined);
+    const game = new Game(canvas, events, sfx);
+    sfx.enabled = false;
+    game.start(cfg);
+    expect(unlock).not.toHaveBeenCalled();
+    sfx.enabled = true;
+    game.start(cfg);
+    expect(unlock).toHaveBeenCalledTimes(1);
+    game.destroy();
+  });
+
+  it('destroy 會釋放 AudioContext', () => {
+    const sfx = new Sfx();
+    const dispose = vi.spyOn(sfx, 'dispose');
+    new Game(canvas, events, sfx).destroy();
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispose 關閉 AudioContext，之後 unlock 會重新建立', () => {
+    const close = vi.fn(() => Promise.resolve());
+    const ctors = vi.fn();
+    vi.stubGlobal(
+      'AudioContext',
+      class {
+        state = 'running';
+        close = close;
+        constructor() {
+          ctors();
+        }
+      },
+    );
+    const sfx = new Sfx();
+    sfx.unlock();
+    sfx.dispose();
+    sfx.dispose();
+    expect(close).toHaveBeenCalledTimes(1);
+    sfx.unlock();
+    expect(ctors).toHaveBeenCalledTimes(2);
+  });
+});

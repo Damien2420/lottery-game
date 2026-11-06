@@ -1,3 +1,4 @@
+import { MAX_PLAYERS } from '@/lib/pinball/physics';
 import { BOARD_IDS, type BoardId } from '@/lib/pinball/boards/types';
 
 /** localStorage 使用的單一 key */
@@ -75,9 +76,6 @@ function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
 }
 
-/** 單場參加人數上限（與 physics.ts 的 MAX_PLAYERS 相同；此處不匯入以避免相依 matter-js） */
-const MAX_NAMES = 200;
-
 /** 是否為整數 */
 function isInt(v: unknown): v is number {
   return typeof v === 'number' && Number.isInteger(v);
@@ -128,7 +126,7 @@ function isDraw(v: unknown): boolean {
   const winners: unknown[] = v.winners;
   return (
     n >= 1 &&
-    n <= MAX_NAMES &&
+    n <= MAX_PLAYERS &&
     v.winnerCount >= 1 &&
     winners.length <= v.winnerCount &&
     winners.every((w) => isInt(w) && w >= 0 && w < n) &&

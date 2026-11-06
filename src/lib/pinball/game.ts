@@ -86,7 +86,8 @@ export class Game {
    */
   start(cfg: SimConfig): void {
     try {
-      this.sfx.unlock();
+      // 音效關閉時不建立 AudioContext（如首頁示範沒有使用者操作）；之後開啟音效，下一次使用者啟動時才解鎖
+      if (this.sfx.enabled) this.sfx.unlock();
     } catch {
       // 音效無法啟用（例如瀏覽器不支援）不應影響抽獎本身
     }
@@ -112,6 +113,7 @@ export class Game {
     cancelAnimationFrame(this.rafId);
     this.resizeObserver.disconnect();
     this.sim = null;
+    this.sfx.dispose();
   }
 
   /** 每個畫面更新：以固定步長推進模擬，再更新鏡頭並繪製。 */

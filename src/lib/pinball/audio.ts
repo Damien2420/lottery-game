@@ -14,6 +14,13 @@ export class Sfx {
     if (this.ctx.state === 'suspended') void this.ctx.resume();
   }
 
+  /** 關閉並釋放 AudioContext；之後再呼叫 unlock() 會重新建立。 */
+  dispose(): void {
+    const ctx = this.ctx;
+    this.ctx = null;
+    if (ctx && ctx.state !== 'closed') void ctx.close().catch(() => undefined);
+  }
+
   /**
    * 碰撞音效，內部做節流避免大量彈珠同時碰撞時爆音。
    * @param speed 彈珠撞擊時的速度，決定音量
