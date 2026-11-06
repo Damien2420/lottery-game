@@ -23,3 +23,8 @@ npm-debug.log*
 # 作業系統
 .DS_Store
 Thumbs.db
+
+# Next.js
+.next
+next-env.d.ts
+*.tsbuildinfo

@@ -4,7 +4,7 @@
  * 執行：npx tsx scripts/simulate.ts [人數] [場數]
  */
 import Matter from 'matter-js';
-import { buildBoard, FINISH_Y, MARBLE_R, WORLD_W } from '../src/board';
+import { buildBoard, FINISH_Y, MARBLE_R, WORLD_W } from '../src/lib/pinball/board';
 
 const { Engine, Composite, Bodies, Body, Events, Vector } = Matter;
 const STEP_MS = 1000 / 60;
