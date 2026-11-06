@@ -28,3 +28,6 @@ Thumbs.db
 .next
 next-env.d.ts
 *.tsbuildinfo
+
+# Next.js 開發伺服器自動產生
+AGENTS.md

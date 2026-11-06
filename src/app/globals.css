@@ -11,12 +11,6 @@ body {
   font-family: system-ui, "Microsoft JhengHei", "PingFang TC", sans-serif;
 }
 
-#app {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  height: 100vh;
-}
-
 .panel {
   display: flex;
   flex-direction: column;
@@ -43,12 +37,6 @@ h2 {
   flex-direction: column;
   gap: 6px;
   font-size: 14px;
-}
-
-.field em {
-  float: right;
-  font-style: normal;
-  color: #8a93b8;
 }
 
 .field.inline {
@@ -106,8 +94,7 @@ button:disabled {
   color: #ffd166;
 }
 
-.results,
-.history {
+.results {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -128,18 +115,6 @@ button:disabled {
   min-width: 3.5em;
   color: #ffd166;
   font-weight: 700;
-}
-
-.results .dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.history li {
-  padding: 4px 0;
-  color: #b8c0e0;
-  border-bottom: 1px dashed #222c50;
 }
 
 .stage {
@@ -207,12 +182,6 @@ button.secondary {
 }
 
 @media (max-width: 800px) {
-  #app {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 75vh;
-    height: auto;
-  }
-
   .play {
     grid-template-columns: 1fr;
     grid-template-rows: auto 75vh;
