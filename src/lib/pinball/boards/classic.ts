@@ -30,8 +30,8 @@ function buildClassic(): Board {
   // 1. 第一段釘陣
   statics.push(...pegField(290, 700, 48, 40, 5));
 
-  // 2. 之字斜坡（坡度約 20 度，太平緩彈珠會堆積停住）
-  statics.push(segment(0, 730, 450, 890), segment(600, 950, 150, 1100));
+  // 2. 之字斜坡（坡度約 24 度；原本約 20 度時 200 顆彈珠會在坡上堆積停住）
+  statics.push(segment(0, 720, 450, 920), segment(600, 950, 150, 1150));
 
   // 3. 旋轉擋板區
   spinners.push(

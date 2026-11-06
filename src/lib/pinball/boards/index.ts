@@ -1,16 +1,14 @@
+import { cascade } from './cascade';
 import { classic } from './classic';
 import type { BoardDef, BoardId } from './types';
+import { zigzag } from './zigzag';
 
 export type { Board, BoardDef, BoardId, Spinner } from './types';
 
-/**
- * 所有台面定義，以識別碼索引。
- * 目前只有 classic；zigzag、cascade 加入前先以型別斷言宣告為完整 Record，
- * 外部請透過 getBoard 取得，避免存取到尚未實作的台面。
- */
-export const BOARDS = { classic } as Record<BoardId, BoardDef>;
+/** 所有台面定義，以識別碼索引 */
+export const BOARDS: Record<BoardId, BoardDef> = { classic, zigzag, cascade };
 
-/** 依顯示順序排列的台面清單（只含已實作的台面） */
+/** 依顯示順序排列的台面清單 */
 export const BOARD_LIST: BoardDef[] = Object.values(BOARDS);
 
 /**
