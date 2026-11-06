@@ -1,5 +1,6 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { PinballCanvas, type PinballRun } from '@/components/PinballCanvas';
 import { newSeed, parseNames, validateDrawInput } from '@/lib/draw';
@@ -57,6 +58,9 @@ function sameNames(a: string[], b: string[]): boolean {
  */
 export default function PlayClient(): React.JSX.Element {
   const { data, update } = useStoredData();
+  const listParam = useSearchParams().get('list');
+  /** 是否已處理過網址的 ?list 預選 */
+  const [paramApplied, setParamApplied] = useState(false);
   /** 名單來源：空字串為直接輸入（未存檔），其餘為名單 ID */
   const [source, setSource] = useState('');
   const [text, setText] = useState('');
@@ -98,6 +102,16 @@ export default function PlayClient(): React.JSX.Element {
         <section className="stage" />
       </div>
     );
+  }
+
+  // 首次取得資料時，依網址 ?list 預選名單；找不到則忽略
+  if (!paramApplied) {
+    setParamApplied(true);
+    const preset = listParam ? data.lists.find((l) => l.id === listParam) : undefined;
+    if (preset) {
+      setSource(preset.id);
+      setText(preset.names.join('\n'));
+    }
   }
 
   const selectedList = data.lists.find((l) => l.id === source);

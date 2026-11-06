@@ -224,3 +224,63 @@ button.secondary {
     border-bottom: 1px solid #222c50;
   }
 }
+
+/* 名單管理頁 */
+.lists {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.lists .editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #2c3866;
+  border-radius: 8px;
+  background: #111831;
+}
+
+.lists .actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.lists .actions a {
+  color: #9fb3ff;
+  font-size: 14px;
+}
+
+.list-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list-rows li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #18214a;
+}
+
+.list-rows .info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: #b8c0e0;
+}
