@@ -1,7 +1,11 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { HomeDemo } from '@/components/HomeDemo';
 import { FAQ, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
 import styles from './home.module.css';
+
+/** 首頁專屬 metadata：只有首頁指定 canonical，避免全站都指向 / */
+export const metadata: Metadata = { alternates: { canonical: '/' } };
 
 /** 首頁特色清單 */
 const FEATURES = [
