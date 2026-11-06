@@ -70,17 +70,27 @@ npm run sim -- all 200 3
 ```
 ├── src/
 │   ├── app/                  頁面與路由（/、/play、/lists、/history、/settings）
+│   │   ├── home.module.css   首頁樣式
+│   │   ├── globals.css       全站樣式
 │   │   ├── sitemap.ts        sitemap
 │   │   ├── robots.ts         robots
 │   │   └── opengraph-image.tsx / twitter-image.tsx   社群分享圖
-│   ├── components/           各頁面的客戶端元件、導覽列、彈珠台畫布
+│   ├── components/           各頁面的客戶端元件與載入器、導覽列
+│   │   ├── PinballCanvas.tsx 彈珠台畫布（抽獎與重播共用）
+│   │   └── HomeDemo.tsx      首頁示範動畫
 │   └── lib/
 │       ├── pinball/          物理模擬、亂數、音效、渲染
 │       │   └── boards/       台面配置（classic、zigzag、cascade）
-│       ├── storage/          localStorage 資料層（schema、操作、store）
+│       ├── storage/          localStorage 資料層
+│       │   ├── schema.ts     資料結構與驗證
+│       │   ├── ops.ts        名單與紀錄操作
+│       │   ├── store.ts      讀寫與訂閱
+│       │   └── useStoredData.ts  React 訂閱 hook
 │       ├── draw.ts           抽獎流程
 │       ├── drawLock.ts       抽獎進行中的鎖定
 │       ├── replay.ts         歷史紀錄重播
+│       ├── listForm.ts       名單表單解析與驗證
+│       ├── backupFileName.ts 備份檔名產生
 │       └── site.ts           網站網址設定
 ├── scripts/simulate.ts       無頭模擬腳本
 └── tests/                    測試

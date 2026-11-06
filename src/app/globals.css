@@ -39,6 +39,12 @@ h2 {
   font-size: 14px;
 }
 
+.field em {
+  float: right;
+  font-style: normal;
+  color: #8a93b8;
+}
+
 .field.inline {
   flex-direction: row;
   align-items: center;
