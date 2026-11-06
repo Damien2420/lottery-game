@@ -1,4 +1,4 @@
-import { STORAGE_KEY, emptyData, isStoredData, type StoredData } from './schema';
+import { STORAGE_KEY, emptyData, normalizeStoredData, type StoredData } from './schema';
 
 /** 寫入結果：失敗時區分容量已滿與無法存取 */
 export type SaveResult = { ok: true } | { ok: false; reason: 'unavailable' | 'quota' };
@@ -18,7 +18,7 @@ function notify(): void {
 function parseRaw(raw: string): StoredData | null {
   try {
     const v: unknown = JSON.parse(raw);
-    return isStoredData(v) ? v : null;
+    return normalizeStoredData(v);
   } catch {
     return null;
   }
@@ -112,8 +112,9 @@ export function parseImport(
   } catch {
     return { ok: false, error: '檔案不是有效的 JSON' };
   }
-  if (!isStoredData(v)) return { ok: false, error: '檔案格式不符或版本不支援' };
-  return { ok: true, data: v };
+  const data = normalizeStoredData(v);
+  if (!data) return { ok: false, error: '檔案格式不符或版本不支援' };
+  return { ok: true, data };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { STORAGE_KEY, emptyData, isStoredData } from '@/lib/storage/schema';
+import { STORAGE_KEY, emptyData, isStoredData, type DrawRecord } from '@/lib/storage/schema';
 import {
   exportJson,
   getServerSnapshot,
@@ -83,11 +83,81 @@ describe('store', () => {
   });
 });
 
+/** 建立合法抽獎紀錄，可覆寫欄位 */
+function draw(over: Partial<DrawRecord> = {}): DrawRecord {
+  return {
+    id: 'd1',
+    createdAt: 't',
+    listId: null,
+    listTitle: 'x',
+    names: ['A', 'B', 'C'],
+    boardId: 'classic',
+    boardVersion: 1,
+    engineVersion: 1,
+    winnerCount: 2,
+    seed: 4294967295,
+    winners: [2, 0],
+    ...over,
+  };
+}
+
+/** 以指定紀錄組出完整資料 */
+function withDraws(...draws: DrawRecord[]) {
+  return { ...createList(emptyData(), 't', ['A'], 't', 'l1'), draws };
+}
+
 describe('isStoredData', () => {
   it('接受空資料，拒絕缺欄位或型別錯誤的資料', () => {
     expect(isStoredData(emptyData())).toBe(true);
     expect(isStoredData(null)).toBe(false);
     expect(isStoredData({ ...emptyData(), lists: [{ id: 1 }] })).toBe(false);
     expect(isStoredData({ ...emptyData(), preferences: { sound: 'yes' } })).toBe(false);
+  });
+
+  it('接受含名單、紀錄與偏好（有或無 lastBoardId）的資料', () => {
+    const d = withDraws(draw());
+    expect(isStoredData(d)).toBe(true);
+    const prefs = { sound: false, removeWinners: false, lastBoardId: 'cascade' };
+    expect(isStoredData({ ...d, preferences: prefs })).toBe(true);
+  });
+
+  it('接受未知 boardId 的紀錄（重播時再處理）', () => {
+    expect(isStoredData(withDraws(draw({ boardId: 'gone' })))).toBe(true);
+  });
+
+  it.each<[string, Partial<DrawRecord>]>([
+    ['winners 非整數', { winners: [0.5] }],
+    ['winners 為負數', { winners: [-1] }],
+    ['winners 超出 names', { winners: [3] }],
+    ['winners 重複', { winners: [1, 1] }],
+    ['winners 多於 winnerCount', { winners: [0, 1, 2], winnerCount: 2 }],
+    ['winnerCount 非整數', { winnerCount: 1.5 }],
+    ['winnerCount 為 0', { winnerCount: 0, winners: [] }],
+    ['seed 非整數', { seed: 1.5 }],
+    ['seed 為負數', { seed: -1 }],
+    ['seed 超過 uint32', { seed: 4294967296 }],
+    ['boardVersion 非整數', { boardVersion: 1.5 }],
+    ['engineVersion 非整數', { engineVersion: 0.1 }],
+    ['boardId 為空字串', { boardId: '' }],
+    ['names 為空', { names: [], winners: [] }],
+    ['names 超過 200', { names: Array.from({ length: 201 }, (_, i) => String(i)) }],
+  ])('拒絕不合法紀錄：%s', (_label, over) => {
+    expect(isStoredData(withDraws(draw(over)))).toBe(false);
+  });
+
+  it('拒絕重複的名單 id 或紀錄 id', () => {
+    expect(isStoredData(withDraws(draw(), draw()))).toBe(false);
+    const d = createList(createList(emptyData(), 'a', [], 't', 'l1'), 'b', [], 't', 'l1');
+    expect(isStoredData(d)).toBe(false);
+  });
+
+  it('未知的 lastBoardId 在 loadData 與 parseImport 時被移除', () => {
+    const raw = {
+      ...emptyData(),
+      preferences: { sound: true, removeWinners: true, lastBoardId: 'nope' },
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(raw));
+    expect(loadData()).toEqual(emptyData());
+    expect(parseImport(JSON.stringify(raw))).toEqual({ ok: true, data: emptyData() });
   });
 });

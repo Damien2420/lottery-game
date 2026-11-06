@@ -1,4 +1,4 @@
-import type { BoardId } from '@/lib/pinball/boards/types';
+import { BOARD_IDS, type BoardId } from '@/lib/pinball/boards/types';
 
 /** localStorage 使用的單一 key */
 export const STORAGE_KEY = 'pinball-lottery';
@@ -24,7 +24,8 @@ export interface DrawRecord {
   listTitle: string;
   /** 抽獎當下的參加者快照，重播只依賴此快照 */
   names: string[];
-  boardId: BoardId;
+  /** 刻意不用 BoardId：台面日後可能移除，紀錄仍須保留，重播時再判斷台面是否存在 */
+  boardId: string;
   boardVersion: number;
   /** 引擎版本：物理參數、模擬邏輯、亂數演算法或 Matter.js 版本任一變動即升版 */
   engineVersion: number;
@@ -74,9 +75,22 @@ function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
 }
 
-/** 是否為有限數字 */
-function isNum(v: unknown): v is number {
-  return typeof v === 'number' && Number.isFinite(v);
+/** 單場參加人數上限（與 physics.ts 的 MAX_PLAYERS 相同；此處不匯入以避免相依 matter-js） */
+const MAX_NAMES = 200;
+
+/** 是否為整數 */
+function isInt(v: unknown): v is number {
+  return typeof v === 'number' && Number.isInteger(v);
+}
+
+/** 是否為 32 位元無號整數 */
+function isUint32(v: unknown): v is number {
+  return isInt(v) && v >= 0 && v <= 0xffffffff;
+}
+
+/** 是否為已知台面識別碼 */
+function isBoardId(v: unknown): v is BoardId {
+  return typeof v === 'string' && (BOARD_IDS as readonly string[]).includes(v);
 }
 
 /** 驗證單一名單結構 */
@@ -93,21 +107,38 @@ function isList(v: unknown): boolean {
 
 /** 驗證單筆抽獎紀錄結構（boardId 只檢查為字串，是否存在由重播時判斷） */
 function isDraw(v: unknown): boolean {
+  if (
+    !isObj(v) ||
+    typeof v.id !== 'string' ||
+    typeof v.createdAt !== 'string' ||
+    !(v.listId === null || typeof v.listId === 'string') ||
+    typeof v.listTitle !== 'string' ||
+    !isStringArray(v.names) ||
+    typeof v.boardId !== 'string' ||
+    v.boardId === '' ||
+    !isInt(v.boardVersion) ||
+    !isInt(v.engineVersion) ||
+    !isInt(v.winnerCount) ||
+    !isUint32(v.seed) ||
+    !Array.isArray(v.winners)
+  ) {
+    return false;
+  }
+  const n = v.names.length;
+  const winners: unknown[] = v.winners;
   return (
-    isObj(v) &&
-    typeof v.id === 'string' &&
-    typeof v.createdAt === 'string' &&
-    (v.listId === null || typeof v.listId === 'string') &&
-    typeof v.listTitle === 'string' &&
-    isStringArray(v.names) &&
-    typeof v.boardId === 'string' &&
-    isNum(v.boardVersion) &&
-    isNum(v.engineVersion) &&
-    isNum(v.winnerCount) &&
-    isNum(v.seed) &&
-    Array.isArray(v.winners) &&
-    v.winners.every(isNum)
+    n >= 1 &&
+    n <= MAX_NAMES &&
+    v.winnerCount >= 1 &&
+    winners.length <= v.winnerCount &&
+    winners.every((w) => isInt(w) && w >= 0 && w < n) &&
+    new Set(winners).size === winners.length
   );
+}
+
+/** 陣列內 id 是否皆不重複 */
+function uniqueIds(arr: { id: unknown }[]): boolean {
+  return new Set(arr.map((x) => x.id)).size === arr.length;
 }
 
 /**
@@ -117,13 +148,27 @@ function isDraw(v: unknown): boolean {
  */
 export function isStoredData(v: unknown): v is StoredData {
   if (!isObj(v) || v.schemaVersion !== 1) return false;
-  if (!Array.isArray(v.lists) || !v.lists.every(isList)) return false;
-  if (!Array.isArray(v.draws) || !v.draws.every(isDraw)) return false;
+  if (!Array.isArray(v.lists) || !v.lists.every(isList) || !uniqueIds(v.lists)) return false;
+  if (!Array.isArray(v.draws) || !v.draws.every(isDraw) || !uniqueIds(v.draws)) return false;
   const p = v.preferences;
   return (
     isObj(p) &&
     typeof p.sound === 'boolean' &&
     typeof p.removeWinners === 'boolean' &&
-    (p.lastBoardId === undefined || typeof p.lastBoardId === 'string')
+    (p.lastBoardId === undefined || isBoardId(p.lastBoardId))
   );
+}
+
+/**
+ * 驗證並正規化：未知的 lastBoardId 不使整份資料失效，而是移除該欄位。
+ * @param v 待驗證的值（例如剛解析的 JSON）
+ * @returns 合法時回傳正規化後的資料，否則 null
+ */
+export function normalizeStoredData(v: unknown): StoredData | null {
+  if (isObj(v) && isObj(v.preferences) && !isBoardId(v.preferences.lastBoardId)) {
+    const rest = { ...v.preferences };
+    delete rest.lastBoardId;
+    v = { ...v, preferences: rest };
+  }
+  return isStoredData(v) ? v : null;
 }

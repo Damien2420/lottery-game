@@ -1,7 +1,10 @@
 import type Matter from 'matter-js';
 
+/** 所有已知台面識別碼（不含 matter-js 執行期相依，供儲存層驗證） */
+export const BOARD_IDS = ['classic', 'zigzag', 'cascade'] as const;
+
 /** 台面識別碼 */
-export type BoardId = 'classic' | 'zigzag' | 'cascade';
+export type BoardId = (typeof BOARD_IDS)[number];
 
 /** 旋轉擋板 */
 export interface Spinner {
