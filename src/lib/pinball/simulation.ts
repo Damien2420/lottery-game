@@ -1,7 +1,18 @@
 import Matter from 'matter-js';
 import { getBoard } from './boards';
 import type { Board, BoardId } from './boards/types';
-import { BUMPER_KICK, MARBLE_OPTS, MARBLE_R, MAX_SPEED, STEP_MS, STUCK_MS, STUCK_SPEED, WORLD_W } from './physics';
+import {
+  BUMPER_KICK,
+  MARBLE_OPTS,
+  MARBLE_R,
+  MAX_SPEED,
+  NO_PROGRESS_MS,
+  PROGRESS_MIN_Y,
+  STEP_MS,
+  STUCK_MS,
+  STUCK_SPEED,
+  WORLD_W,
+} from './physics';
 import { createRng } from './rng';
 
 const { Engine, Composite, Bodies, Body, Events, Vector } = Matter;
@@ -46,6 +57,10 @@ interface MarbleState extends SimMarble {
   order: number;
   /** 開始靜止的物理時間戳，未靜止為 null */
   stillSince: number | null;
+  /** 目前為止到達過的最大 y（越大越接近終點） */
+  bestY: number;
+  /** bestY 最近一次前進至少 PROGRESS_MIN_Y 的物理時間戳 */
+  bestSince: number;
 }
 
 /**
@@ -116,6 +131,8 @@ export class Simulation {
         finished: false,
         order: i,
         stillSince: null,
+        bestY: y,
+        bestSince: 0,
       };
     });
     this.marbles = this.states;
@@ -179,21 +196,41 @@ export class Simulation {
       if (b.position.x < 0 || b.position.x > WORLD_W) {
         Body.setPosition(b, { x: Math.min(Math.max(b.position.x, MARBLE_R), WORLD_W - MARBLE_R), y: b.position.y });
       }
+      // 卡住判定一：低速靜止超過 STUCK_MS（常見情況，反應快）
       if (b.speed < STUCK_SPEED) {
         m.stillSince ??= now;
-        if (now - m.stillSince > STUCK_MS) {
-          Body.setVelocity(b, { x: (this.rng() - 0.5) * 8, y: -5 });
-          m.stillSince = null;
-          this.nudgeCount++;
-          const bucket = Math.floor(b.position.y / 100) * 100;
-          this.stuckAt[bucket] = (this.stuckAt[bucket] ?? 0) + 1;
-        }
+        if (now - m.stillSince > STUCK_MS) this.nudge(m, now);
       } else {
         m.stillSince = null;
+      }
+      // 卡住判定二（看門狗）：不論速度，NO_PROGRESS_MS 內 y 沒有前進 PROGRESS_MIN_Y 就推一把，
+      // 處理被夾在保險桿與牆面之間反覆彈射、速度始終高於門檻的彈珠
+      if (b.position.y >= m.bestY + PROGRESS_MIN_Y) {
+        m.bestY = b.position.y;
+        m.bestSince = now;
+      } else if (now - m.bestSince > NO_PROGRESS_MS) {
+        this.nudge(m, now);
       }
     }
 
     return { arrivals: this.arrive(crossed), hits: this.hits };
+  }
+
+  /**
+   * 推動卡住的彈珠：給一個隨機水平、向上的速度，並重設兩種卡住判定的計時。
+   * 亂數取自同一個種子亂數流，呼叫順序由 step 內固定的彈珠迭代順序決定。
+   * @param m 要推動的彈珠
+   * @param now 目前的物理時間戳
+   */
+  private nudge(m: MarbleState, now: number): void {
+    const b = m.body;
+    Body.setVelocity(b, { x: (this.rng() - 0.5) * 8, y: -5 });
+    m.stillSince = null;
+    m.bestY = b.position.y;
+    m.bestSince = now;
+    this.nudgeCount++;
+    const bucket = Math.floor(b.position.y / 100) * 100;
+    this.stuckAt[bucket] = (this.stuckAt[bucket] ?? 0) + 1;
   }
 
   /**

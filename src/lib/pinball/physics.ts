@@ -1,6 +1,6 @@
 /**
  * 物理與模擬常數。
- * 任何會影響模擬結果的數值（限速、卡住判定、保險桿彈力、彈珠材質、步長）變動時，
+ * 任何會影響模擬結果的數值（限速、卡住判定與看門狗、保險桿彈力、彈珠材質、步長）變動時，
  * 都必須調升 ENGINE_VERSION，讓舊紀錄的重播能偵測到引擎已更新。
  */
 
@@ -20,6 +20,10 @@ export const MAX_SPEED = 16;
 export const STUCK_SPEED = 0.2;
 /** 靜止超過此時間（毫秒，物理時間）即推一把 */
 export const STUCK_MS = 1500;
+/** 看門狗：彈珠的最大 y 至少前進這麼多才算有進度 */
+export const PROGRESS_MIN_Y = 30;
+/** 看門狗：超過此時間（毫秒，物理時間）沒有進度即推一把，不論速度 */
+export const NO_PROGRESS_MS = 6000;
 /** 保險桿彈開速度 */
 export const BUMPER_KICK = 9;
 

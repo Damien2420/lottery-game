@@ -1,4 +1,6 @@
+import Matter from 'matter-js';
 import { describe, expect, it } from 'vitest';
+import { NO_PROGRESS_MS, STEP_MS, STUCK_SPEED } from '@/lib/pinball/physics';
 import { orderArrivals, runHeadless, Simulation } from '@/lib/pinball/simulation';
 
 const names = (n: number) => Array.from({ length: n }, (_, i) => `P${i}`);
@@ -25,7 +27,23 @@ describe('Simulation', () => {
   });
   it('isDone 後 winners 長度等於名額，且索引不重複', () => {
     const sim = new Simulation({ names: names(20), boardId: 'classic', seed: 99, winnerCount: 4 });
-    while (!sim.isDone()) sim.step();
+    // 步數上限避免回歸時測試卡死
+    while (!sim.isDone() && sim.stepCount < 60 * 300) sim.step();
+    expect(sim.isDone()).toBe(true);
     expect(new Set(sim.winners).size).toBe(4);
+  });
+  it('看門狗：高速但 y 沒有進度的彈珠也會被推動', () => {
+    const sim = new Simulation({ names: ['A'], boardId: 'classic', seed: 1, winnerCount: 1 });
+    const b = sim.marbles[0].body;
+    // 模擬被夾住反覆彈射：每步都拉回原位並給水平高速，速度遠高於靜止門檻、y 永遠不前進
+    const limit = Math.ceil((NO_PROGRESS_MS + 1000) / STEP_MS);
+    while (sim.nudges === 0 && sim.stepCount < limit) {
+      Matter.Body.setPosition(b, { x: 300, y: 150 });
+      Matter.Body.setVelocity(b, { x: 4, y: 0 });
+      sim.step();
+      expect(b.speed).toBeGreaterThan(STUCK_SPEED);
+    }
+    expect(sim.nudges).toBe(1);
+    expect(sim.stuckAt[100]).toBe(1);
   });
 });
