@@ -151,8 +151,69 @@ button:disabled {
   display: block;
 }
 
+/* 全站導覽列 */
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  min-height: 44px;
+  padding: 0 20px;
+  align-items: center;
+  background: #111831;
+  border-bottom: 1px solid #222c50;
+  font-size: 14px;
+}
+
+.nav a {
+  color: #9fb3ff;
+  text-decoration: none;
+}
+
+.nav a:hover {
+  color: #fff;
+}
+
+/* 抽獎頁版面：扣除導覽列高度 */
+.play {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  height: calc(100vh - 44px);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+select,
+input[type="text"] {
+  background: #0b1020;
+  color: inherit;
+  border: 1px solid #2c3866;
+  border-radius: 6px;
+  padding: 8px;
+  font: inherit;
+}
+
+button.secondary {
+  padding: 8px;
+  background: #2c3866;
+  font-size: 14px;
+}
+
 @media (max-width: 800px) {
   #app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 75vh;
+    height: auto;
+  }
+
+  .play {
     grid-template-columns: 1fr;
     grid-template-rows: auto 75vh;
     height: auto;
