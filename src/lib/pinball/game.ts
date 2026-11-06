@@ -1,40 +1,26 @@
-import Matter from 'matter-js';
+import type Matter from 'matter-js';
 import type { Sfx } from './audio';
-import { classic } from './boards/classic';
-import type { Board } from './boards/types';
-import { MARBLE_R, WORLD_W } from './physics';
+import { getBoard } from './boards';
+import type { Board, BoardId } from './boards/types';
+import { MARBLE_R, STEP_MS, WORLD_W } from './physics';
+import { Simulation, type SimConfig } from './simulation';
 
-const { Engine, Composite, Bodies, Body, Events, Vector } = Matter;
-
-/** 固定物理步長（毫秒），與畫面更新率脫鉤，確保不同裝置結果一致 */
-const STEP_MS = 1000 / 60;
-/** 彈珠最高速度，避免高速穿透釘子 */
-const MAX_SPEED = 16;
-/** 低於此速度視為靜止 */
-const STUCK_SPEED = 0.2;
-/** 靜止超過此時間即推一把 */
-const STUCK_MS = 1500;
-/** 保險桿彈開速度 */
-const BUMPER_KICK = 9;
 /** 畫面至少要顯示的世界高度，決定縮放比例 */
 const MIN_VIEW_H = 720;
 
-/** 參加者對應的彈珠 */
-export interface Marble {
-  body: Matter.Body;
-  name: string;
-  color: string;
-  finished: boolean;
-  /** 開始靜止的物理時間戳，未靜止為 null */
-  stillSince: number | null;
-}
-
 /** 遊戲對外通知的事件 */
 export interface GameEvents {
-  /** 前 N 名中的某顆彈珠抵達終點 */
-  onArrive(marble: Marble, rank: number): void;
-  /** 所有得獎者已產生 */
-  onDone(winners: Marble[]): void;
+  /**
+   * 得獎名額內的某顆彈珠抵達終點。
+   * @param index 參加者在名單中的索引
+   * @param rank 名次（從 1 開始）
+   */
+  onArrive(index: number, rank: number): void;
+  /**
+   * 所有得獎者已產生（每場只觸發一次）。
+   * @param winners 依名次排列的得獎者索引
+   */
+  onDone(winners: number[]): void;
 }
 
 const BODY_COLORS: Record<string, string> = {
@@ -45,18 +31,17 @@ const BODY_COLORS: Record<string, string> = {
 };
 
 /**
- * 彈珠台抽獎主體：負責物理模擬、終點判定、鏡頭跟隨與 Canvas 繪製。
+ * 彈珠台繪製層：以固定步長驅動 Simulation，負責音效、鏡頭跟隨與 Canvas 繪製。
+ * 物理與名次判定全部在 Simulation，這裡不含任何物理邏輯。
  */
 export class Game {
   private readonly ctx: CanvasRenderingContext2D;
-  private readonly engine = Engine.create({ positionIterations: 10, velocityIterations: 8 });
-  private readonly board: Board = classic.build();
-  private marbles: Marble[] = [];
-  private byBodyId = new Map<number, Marble>();
-  private arrived: Marble[] = [];
-  private pendingKicks: [Matter.Body, Matter.Body][] = [];
+  private readonly resizeObserver: ResizeObserver;
+  /** 目前顯示的台面（閒置時為 showBoard 建構的靜態台面，進行中為模擬的台面） */
+  private board: Board | null = null;
+  private sim: Simulation | null = null;
   private winnerCount = 1;
-  private done = true;
+  private doneFired = false;
 
   private camY = 0;
   private scale = 1;
@@ -66,6 +51,8 @@ export class Game {
   private cssH = 0;
   private acc = 0;
   private lastTime = 0;
+  private rafId = 0;
+  private destroyed = false;
 
   /**
    * @param canvas 繪製用的畫布，尺寸跟隨其父元素
@@ -78,148 +65,96 @@ export class Game {
     private readonly sfx: Sfx,
   ) {
     this.ctx = canvas.getContext('2d')!;
-    Composite.add(this.engine.world, [...this.board.statics, ...this.board.spinners.map((s) => s.body)]);
-    Events.on(this.engine, 'collisionStart', (e) => this.handleCollisions(e));
-    new ResizeObserver(() => this.resize()).observe(canvas.parentElement!);
+    this.resizeObserver = new ResizeObserver(() => this.resize());
+    this.resizeObserver.observe(canvas.parentElement!);
     this.resize();
-    requestAnimationFrame((t) => this.frame(t));
+    this.rafId = requestAnimationFrame((t) => this.frame(t));
   }
 
   /**
-   * 開始新一輪抽獎，會清除上一輪殘留的彈珠。
-   * @param names 參加者名單
-   * @param winnerCount 要抽出的名額
+   * 閒置時顯示指定台面（擋板停在初始角度，不會轉動）。進行中的場次會被中止。
+   * @param boardId 台面識別碼
    */
-  start(names: string[], winnerCount: number): void {
-    Composite.remove(
-      this.engine.world,
-      this.marbles.filter((m) => !m.finished).map((m) => m.body),
-    );
-    this.marbles = [];
-    this.byBodyId.clear();
-    this.arrived = [];
-    this.pendingKicks = [];
-    this.winnerCount = winnerCount;
-    this.done = false;
-    this.camY = 0;
-
-    // 洗牌後才分配起始位置，避免名單順序影響起跑點
-    const gap = MARBLE_R * 2 + 6;
-    const perRow = Math.floor((WORLD_W - 40) / gap);
-    shuffle(names).forEach((name, i) => {
-      const x = 20 + gap / 2 + (i % perRow) * gap + (Math.random() - 0.5) * 4;
-      const y = 30 + Math.floor(i / perRow) * gap + (Math.random() - 0.5) * 4;
-      const body = Bodies.circle(x, y, MARBLE_R, {
-        restitution: 0.5,
-        friction: 0.01,
-        // 預設靜摩擦 0.5 會讓低速彈珠黏在斜坡上
-        frictionStatic: 0,
-        frictionAir: 0.005,
-        density: 0.002,
-        label: 'marble',
-      });
-      const marble: Marble = { body, name, color: `hsl(${(i * 137.5) % 360} 80% 60%)`, finished: false, stillSince: null };
-      this.marbles.push(marble);
-      this.byBodyId.set(body.id, marble);
-    });
-    Composite.add(this.engine.world, this.marbles.map((m) => m.body));
+  showBoard(boardId: BoardId): void {
+    this.stop();
+    this.board = getBoard(boardId)?.build() ?? null;
   }
 
-  /** 每個畫面更新：以固定步長推進物理，再更新鏡頭並繪製。 */
+  /**
+   * 開始新一場，會中止並丟棄上一場。需由使用者操作觸發，以便解鎖音效。
+   * @param cfg 模擬輸入
+   */
+  start(cfg: SimConfig): void {
+    try {
+      this.sfx.unlock();
+    } catch {
+      // 音效無法啟用（例如瀏覽器不支援）不應影響抽獎本身
+    }
+    this.sim = new Simulation(cfg);
+    this.board = this.sim.board;
+    this.winnerCount = cfg.winnerCount;
+    this.doneFired = false;
+    this.camY = 0;
+    this.acc = 0;
+  }
+
+  /** 中止目前這場並丟棄模擬，不觸發 onDone。台面仍會顯示。 */
+  stop(): void {
+    this.sim = null;
+    this.doneFired = false;
+    this.camY = 0;
+  }
+
+  /** 停止畫面迴圈並解除尺寸監聽，可重複呼叫。 */
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    cancelAnimationFrame(this.rafId);
+    this.resizeObserver.disconnect();
+    this.sim = null;
+  }
+
+  /** 每個畫面更新：以固定步長推進模擬，再更新鏡頭並繪製。 */
   private frame(time: number): void {
+    if (this.destroyed) return;
     const dt = this.lastTime ? Math.min(time - this.lastTime, 100) : 0;
     this.lastTime = time;
-    this.acc += dt;
-    while (this.acc >= STEP_MS) {
-      this.step();
-      this.acc -= STEP_MS;
+    if (this.sim) {
+      this.acc += dt;
+      while (this.sim && this.acc >= STEP_MS) {
+        this.advance(this.sim);
+        this.acc -= STEP_MS;
+      }
     }
     this.updateCamera();
     this.render();
-    requestAnimationFrame((t) => this.frame(t));
+    this.rafId = requestAnimationFrame((t) => this.frame(t));
   }
 
-  /** 推進一個物理步長並處理終點、限速、防卡死。 */
-  private step(): void {
-    for (const s of this.board.spinners) Body.setAngle(s.body, s.body.angle + s.speed);
-    Engine.update(this.engine, STEP_MS);
-
-    // 保險桿：沿圓心→彈珠方向彈開
-    for (const [marble, bumper] of this.pendingKicks) {
-      const dir = Vector.normalise(Vector.sub(marble.position, bumper.position));
-      Body.setVelocity(marble, Vector.mult(dir, BUMPER_KICK));
+  /**
+   * 推進模擬一步，並依結果播放音效、通知抵達與完成。
+   * @param sim 目前的模擬
+   */
+  private advance(sim: Simulation): void {
+    const { arrivals, hits } = sim.step();
+    for (const h of hits) this.sfx.hit(h.speed, h.bumper);
+    for (const a of arrivals) {
+      // 名額以外的抵達者不通知、不出聲
+      if (a.rank > this.winnerCount) continue;
+      if (a.rank === 1) this.sfx.win();
+      else this.sfx.finish();
+      this.events.onArrive(a.index, a.rank);
     }
-    this.pendingKicks = [];
-
-    const now = this.engine.timing.timestamp;
-    for (const m of this.marbles) {
-      if (m.finished) continue;
-      const b = m.body;
-      if (b.position.y > this.board.finishY) {
-        this.arrive(m);
-        continue;
-      }
-      if (b.speed > MAX_SPEED) Body.setVelocity(b, Vector.mult(b.velocity, MAX_SPEED / b.speed));
-      // 萬一穿出左右牆，拉回台面內
-      if (b.position.x < 0 || b.position.x > WORLD_W) {
-        Body.setPosition(b, { x: Math.min(Math.max(b.position.x, MARBLE_R), WORLD_W - MARBLE_R), y: b.position.y });
-      }
-      if (b.speed < STUCK_SPEED) {
-        m.stillSince ??= now;
-        if (now - m.stillSince > STUCK_MS) {
-          Body.setVelocity(b, { x: (Math.random() - 0.5) * 8, y: -5 });
-          m.stillSince = null;
-        }
-      } else {
-        m.stillSince = null;
-      }
+    if (!this.doneFired && sim.isDone()) {
+      this.doneFired = true;
+      this.events.onDone(sim.winners.slice());
     }
-  }
-
-  /** 彈珠越過終點線：移出物理世界並記錄名次。 */
-  private arrive(m: Marble): void {
-    m.finished = true;
-    Composite.remove(this.engine.world, m.body);
-    this.arrived.push(m);
-    const rank = this.arrived.length;
-    if (rank > this.winnerCount) return;
-    // 第一名抵達即播放勝利旋律，其餘得獎者播放提示音
-    if (rank === 1) this.sfx.win();
-    else this.sfx.finish();
-    this.events.onArrive(m, rank);
-    if (rank === this.winnerCount) {
-      this.done = true;
-      this.events.onDone(this.arrived.slice());
-    }
-  }
-
-  /** 碰撞事件：播放音效並登記保險桿彈射（於本步長結束後套用）。 */
-  private handleCollisions(e: Matter.IEventCollision<Matter.Engine>): void {
-    for (const { bodyA, bodyB } of e.pairs) {
-      const marble = bodyA.label === 'marble' ? bodyA : bodyB.label === 'marble' ? bodyB : null;
-      if (!marble) continue;
-      const other = marble === bodyA ? bodyB : bodyA;
-      // 彈珠互撞不出聲，避免過於吵雜
-      if (other.label === 'marble') continue;
-      const isBumper = other.label === 'bumper';
-      if (isBumper) this.pendingKicks.push([marble, other]);
-      this.sfx.hit(marble.speed, isBumper);
-    }
-  }
-
-  /** 尚未抵達且位置最低（最接近終點）的彈珠。 */
-  private leader(): Marble | null {
-    let best: Marble | null = null;
-    for (const m of this.marbles) {
-      if (!m.finished && (!best || m.body.position.y > best.body.position.y)) best = m;
-    }
-    return best;
   }
 
   /** 鏡頭平滑跟隨領先者，讓領先者位於畫面約 55% 高度處。 */
   private updateCamera(): void {
-    const lead = this.leader();
-    if (!lead) return;
+    const lead = this.sim?.leader();
+    if (!lead || !this.board) return;
     const viewH = this.cssH / this.scale;
     const target = Math.min(Math.max(lead.body.position.y - viewH * 0.55, 0), Math.max(0, this.board.worldH - viewH));
     this.camY += (target - this.camY) * 0.08;
@@ -241,48 +176,52 @@ export class Game {
 
   /** 繪製整個畫面（只畫出可視範圍內的物件）。 */
   private render(): void {
-    const { ctx } = this;
+    const { ctx, board } = this;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.fillStyle = '#0b1020';
     ctx.fillRect(0, 0, this.cssW, this.cssH);
+    if (!board) return;
 
     ctx.save();
     ctx.translate(this.offsetX, -this.camY * this.scale);
     ctx.scale(this.scale, this.scale);
 
     ctx.fillStyle = '#141b33';
-    ctx.fillRect(0, 0, WORLD_W, this.board.worldH);
-    this.drawFinishLine();
+    ctx.fillRect(0, 0, WORLD_W, board.worldH);
+    this.drawFinishLine(board);
 
     const top = this.camY;
     const bottom = this.camY + this.cssH / this.scale;
     const visible = (b: Matter.Body) => b.bounds.max.y >= top && b.bounds.min.y <= bottom;
 
-    for (const b of this.board.statics) if (visible(b)) this.drawBody(b);
-    for (const s of this.board.spinners) if (visible(s.body)) this.drawBody(s.body);
+    for (const b of board.statics) if (visible(b)) this.drawBody(b);
+    for (const s of board.spinners) if (visible(s.body)) this.drawBody(s.body);
 
-    const lead = this.done ? null : this.leader();
-    ctx.font = '600 11px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.lineJoin = 'round';
-    for (const m of this.marbles) {
-      if (m.finished || !visible(m.body)) continue;
-      const { x, y } = m.body.position;
-      ctx.beginPath();
-      ctx.arc(x, y, MARBLE_R, 0, Math.PI * 2);
-      ctx.fillStyle = m.color;
-      ctx.fill();
-      if (m === lead) {
+    const sim = this.sim;
+    if (sim) {
+      const lead = this.doneFired ? null : sim.leader();
+      ctx.font = '600 11px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.lineJoin = 'round';
+      for (const m of sim.marbles) {
+        if (m.finished || !visible(m.body)) continue;
+        const { x, y } = m.body.position;
+        ctx.beginPath();
+        ctx.arc(x, y, MARBLE_R, 0, Math.PI * 2);
+        ctx.fillStyle = m.color;
+        ctx.fill();
+        if (m === lead) {
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = '#fff';
+          ctx.stroke();
+        }
+        const label = m.name.length > 6 ? `${m.name.slice(0, 6)}…` : m.name;
         ctx.lineWidth = 3;
-        ctx.strokeStyle = '#fff';
-        ctx.stroke();
+        ctx.strokeStyle = '#000';
+        ctx.strokeText(label, x, y - MARBLE_R - 4);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(label, x, y - MARBLE_R - 4);
       }
-      const label = m.name.length > 6 ? `${m.name.slice(0, 6)}…` : m.name;
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#000';
-      ctx.strokeText(label, x, y - MARBLE_R - 4);
-      ctx.fillStyle = '#fff';
-      ctx.fillText(label, x, y - MARBLE_R - 4);
     }
     ctx.restore();
   }
@@ -302,33 +241,22 @@ export class Game {
     ctx.fill();
   }
 
-  /** 繪製黑白棋盤格終點線。 */
-  private drawFinishLine(): void {
+  /**
+   * 繪製黑白棋盤格終點線。
+   * @param board 目前的台面（取得 finishY）
+   */
+  private drawFinishLine(board: Board): void {
     const { ctx } = this;
     const size = 12;
     for (let x = 0, i = 0; x < WORLD_W; x += size, i++) {
       for (let row = 0; row < 2; row++) {
         ctx.fillStyle = (i + row) % 2 ? '#fff' : '#111';
-        ctx.fillRect(x, this.board.finishY + row * size, size, size);
+        ctx.fillRect(x, board.finishY + row * size, size, size);
       }
     }
     ctx.fillStyle = '#ffd166';
     ctx.font = '700 28px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('FINISH', WORLD_W / 2, this.board.finishY + 70);
+    ctx.fillText('FINISH', WORLD_W / 2, board.finishY + 70);
   }
-}
-
-/**
- * Fisher-Yates 洗牌，回傳新陣列不修改原陣列。
- * @param items 原始陣列
- * @returns 洗牌後的新陣列
- */
-function shuffle<T>(items: T[]): T[] {
-  const arr = items.slice();
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
 }
