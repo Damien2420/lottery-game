@@ -1,10 +1,21 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Nav } from '@/components/Nav';
+import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '彈珠台抽獎',
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: '抽獎彈珠台｜免費線上抽獎工具',
+    template: '%s｜抽獎彈珠台',
+  },
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    locale: 'zh_TW',
+    type: 'website',
+    siteName: SITE_NAME,
+  },
 };
 
 /**
