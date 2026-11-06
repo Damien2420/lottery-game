@@ -1,6 +1,8 @@
 import Matter from 'matter-js';
 import type { Sfx } from './audio';
-import { buildBoard, FINISH_Y, MARBLE_R, WORLD_H, WORLD_W, type Board } from './board';
+import { classic } from './boards/classic';
+import type { Board } from './boards/types';
+import { MARBLE_R, WORLD_W } from './physics';
 
 const { Engine, Composite, Bodies, Body, Events, Vector } = Matter;
 
@@ -48,7 +50,7 @@ const BODY_COLORS: Record<string, string> = {
 export class Game {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly engine = Engine.create({ positionIterations: 10, velocityIterations: 8 });
-  private readonly board: Board = buildBoard();
+  private readonly board: Board = classic.build();
   private marbles: Marble[] = [];
   private byBodyId = new Map<number, Marble>();
   private arrived: Marble[] = [];
@@ -153,7 +155,7 @@ export class Game {
     for (const m of this.marbles) {
       if (m.finished) continue;
       const b = m.body;
-      if (b.position.y > FINISH_Y) {
+      if (b.position.y > this.board.finishY) {
         this.arrive(m);
         continue;
       }
@@ -219,7 +221,7 @@ export class Game {
     const lead = this.leader();
     if (!lead) return;
     const viewH = this.cssH / this.scale;
-    const target = Math.min(Math.max(lead.body.position.y - viewH * 0.55, 0), Math.max(0, WORLD_H - viewH));
+    const target = Math.min(Math.max(lead.body.position.y - viewH * 0.55, 0), Math.max(0, this.board.worldH - viewH));
     this.camY += (target - this.camY) * 0.08;
   }
 
@@ -249,7 +251,7 @@ export class Game {
     ctx.scale(this.scale, this.scale);
 
     ctx.fillStyle = '#141b33';
-    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+    ctx.fillRect(0, 0, WORLD_W, this.board.worldH);
     this.drawFinishLine();
 
     const top = this.camY;
@@ -307,13 +309,13 @@ export class Game {
     for (let x = 0, i = 0; x < WORLD_W; x += size, i++) {
       for (let row = 0; row < 2; row++) {
         ctx.fillStyle = (i + row) % 2 ? '#fff' : '#111';
-        ctx.fillRect(x, FINISH_Y + row * size, size, size);
+        ctx.fillRect(x, this.board.finishY + row * size, size, size);
       }
     }
     ctx.fillStyle = '#ffd166';
     ctx.font = '700 28px system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('FINISH', WORLD_W / 2, FINISH_Y + 70);
+    ctx.fillText('FINISH', WORLD_W / 2, this.board.finishY + 70);
   }
 }
 
