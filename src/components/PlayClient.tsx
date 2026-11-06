@@ -4,7 +4,8 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { PinballCanvas, type PinballRun } from '@/components/PinballCanvas';
 import { newSeed, parseNames, validateDrawInput } from '@/lib/draw';
-import { setDrawing } from '@/lib/drawLock';
+import { validateListForm } from '@/lib/listForm';
+import { armBackGuard, setDrawing } from '@/lib/drawLock';
 import { BOARD_LIST, getBoard } from '@/lib/pinball/boards';
 import type { BoardId } from '@/lib/pinball/boards/types';
 import { ENGINE_VERSION } from '@/lib/pinball/physics';
@@ -79,6 +80,16 @@ export default function PlayClient(): React.JSX.Element {
   const [message, setMessage] = useState('');
   const snapshotRef = useRef<DrawSnapshot | null>(null);
   const runKeyRef = useRef(0);
+  /** 解除上一頁／下一頁確認的函式；非抽獎中為 null */
+  const disarmBackRef = useRef<(() => void) | null>(null);
+
+  /** 移除 beforeunload 與上一頁確認（正常結束時呼叫，會彈掉多餘的哨兵歷史紀錄） */
+  const releaseGuards = (): void => {
+    window.removeEventListener('beforeunload', onBeforeUnload);
+    const disarm = disarmBackRef.current;
+    disarmBackRef.current = null;
+    disarm?.();
+  };
 
   // 卸載時若仍在抽獎中：作廢本場，不寫入任何資料
   useEffect(
@@ -87,6 +98,8 @@ export default function PlayClient(): React.JSX.Element {
         snapshotRef.current = null;
         setDrawing(false);
         window.removeEventListener('beforeunload', onBeforeUnload);
+        disarmBackRef.current?.();
+        disarmBackRef.current = null;
       }
     },
     [],
@@ -133,6 +146,8 @@ export default function PlayClient(): React.JSX.Element {
     const names = parseNames(text);
     if (title === '') return setMessage('請輸入名單標題');
     if (names.length === 0) return setMessage('請先輸入參加名單');
+    const form = validateListForm(title, text);
+    if (!form.ok) return setMessage(form.error);
     const id = crypto.randomUUID();
     const r = update((d) => createList(d, title, names, new Date().toISOString(), id));
     if (!r.ok) return setMessage('名單無法保存');
@@ -183,6 +198,12 @@ export default function PlayClient(): React.JSX.Element {
     };
     setDrawing(true);
     window.addEventListener('beforeunload', onBeforeUnload);
+    // 使用者在上一頁確認離開時：本場作廢、不寫入資料（鎖定已由 armBackGuard 解除）
+    disarmBackRef.current = armBackGuard(() => {
+      snapshotRef.current = null;
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      disarmBackRef.current = null;
+    });
     setRunning(true);
     setResults([]);
     setResultNames(names);
@@ -228,7 +249,7 @@ export default function PlayClient(): React.JSX.Element {
     if (s.removeWinners) setText(removeWinnersOnce(s.names, winnerNames).join('\n'));
     if (!r.ok || s.saveFailed) setMessage(SAVE_FAILED);
     setDrawing(false);
-    window.removeEventListener('beforeunload', onBeforeUnload);
+    releaseGuards();
     setRunning(false);
   };
 

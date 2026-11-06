@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Nav } from '@/components/Nav';
-import { isDrawing, LEAVE_MESSAGE, setDrawing } from '@/lib/drawLock';
+import { armBackGuard, isDrawing, LEAVE_MESSAGE, setDrawing } from '@/lib/drawLock';
 
 afterEach(() => {
   cleanup();
@@ -49,6 +49,67 @@ describe('drawLock', () => {
     document.addEventListener('click', stop);
     clickLink('名單管理');
     document.removeEventListener('click', stop);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+});
+
+describe('armBackGuard', () => {
+  it('啟用時推入哨兵紀錄，解除時彈掉它', () => {
+    const push = vi.spyOn(history, 'pushState');
+    const back = vi.spyOn(history, 'back').mockImplementation(() => undefined);
+    const disarm = armBackGuard(() => undefined);
+    expect(push).toHaveBeenCalledTimes(1);
+    disarm();
+    expect(back).toHaveBeenCalledTimes(1);
+  });
+
+  it('哨兵已不在最上層（已換頁）時，解除不後退', () => {
+    const back = vi.spyOn(history, 'back').mockImplementation(() => undefined);
+    const disarm = armBackGuard(() => undefined);
+    history.replaceState(null, '', location.href);
+    disarm();
+    expect(back).not.toHaveBeenCalled();
+  });
+
+  it('抽獎中按上一頁並取消：留在原頁、重新推入哨兵、鎖定不變', () => {
+    const back = vi.spyOn(history, 'back').mockImplementation(() => undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const onLeave = vi.fn();
+    const disarm = armBackGuard(onLeave);
+    setDrawing(true);
+    const push = vi.spyOn(history, 'pushState');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(confirm).toHaveBeenCalledWith(LEAVE_MESSAGE);
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(back).not.toHaveBeenCalled();
+    expect(onLeave).not.toHaveBeenCalled();
+    expect(isDrawing()).toBe(true);
+    disarm();
+  });
+
+  it('抽獎中按上一頁並確定：解除鎖定、通知離開並後退一次', () => {
+    const back = vi.spyOn(history, 'back').mockImplementation(() => undefined);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const onLeave = vi.fn();
+    armBackGuard(onLeave);
+    setDrawing(true);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(onLeave).toHaveBeenCalledTimes(1);
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(isDrawing()).toBe(false);
+    // 監聽已移除，再觸發 popstate 不會重複詢問
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it('未在抽獎或已解除後，popstate 不詢問', () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.spyOn(history, 'back').mockImplementation(() => undefined);
+    const disarm = armBackGuard(() => undefined);
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    disarm();
+    setDrawing(true);
+    window.dispatchEvent(new PopStateEvent('popstate'));
     expect(confirm).not.toHaveBeenCalled();
   });
 });
