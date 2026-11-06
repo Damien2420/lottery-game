@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { HomeDemo } from '@/components/HomeDemo';
+import { BOARD_LIST } from '@/lib/pinball/boards';
 import { FAQ, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from '@/lib/site';
 import styles from './home.module.css';
 
@@ -13,7 +14,10 @@ const FEATURES = [
   { title: '最多 200 人', body: '一場最多可放 200 位參加者，適合尾牙抽獎與大型活動。' },
   { title: '可重播', body: '每場抽獎都會保留種子，隨時能在歷史紀錄重播同一場結果。' },
   { title: '資料只存在你的瀏覽器', body: '名單與紀錄只放在本機 localStorage，不會上傳到任何伺服器。' },
-  { title: '3 種台面', body: '經典、蛇行、瀑布三種彈珠台面，依場合挑選喜歡的。' },
+  {
+    title: `${BOARD_LIST.length} 種台面`,
+    body: `${BOARD_LIST.map((b) => b.name).join('、')}，${BOARD_LIST.length} 種彈珠台面依場合挑選。`,
+  },
 ];
 
 /** 使用步驟 */

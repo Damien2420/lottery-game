@@ -1,5 +1,23 @@
-/** 網站網址（去除結尾斜線），由 NEXT_PUBLIC_SITE_URL 提供，未設定時為本機開發網址 */
-export const SITE_URL: string = (process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000').replace(/\/+$/, '');
+/**
+ * 解析網站網址（去除結尾斜線）。優先順序：
+ * 1. NEXT_PUBLIC_SITE_URL（自訂網域時設定）
+ * 2. https://VERCEL_PROJECT_PRODUCTION_URL（Vercel 自動提供）
+ * 3. http://localhost:3000；正式建置（NODE_ENV=production）會警告但不中斷，讓本機 build 仍可執行
+ * @returns 網站網址
+ */
+function resolveSiteUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL;
+  if (explicit) return explicit.replace(/\/+$/, '');
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (vercel) return `https://${vercel}`.replace(/\/+$/, '');
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('[site] 未設定 NEXT_PUBLIC_SITE_URL，sitemap、canonical 與社群分享圖將使用 http://localhost:3000');
+  }
+  return 'http://localhost:3000';
+}
+
+/** 網站網址（去除結尾斜線） */
+export const SITE_URL: string = resolveSiteUrl();
 
 /** 網站名稱 */
 export const SITE_NAME = '抽獎彈珠台';

@@ -105,7 +105,7 @@ npm run sim -- all 200 3
 ## 部署到 Vercel
 
 1. 將此 repo 匯入 Vercel（Framework Preset 會自動偵測為 Next.js）。
-2. 在 Environment Variables 設定 `NEXT_PUBLIC_SITE_URL` 為部署後的網址，例如 `https://your-domain.example`。sitemap、robots、canonical 與社群分享圖都會使用此值；未設定時預設為 `http://localhost:3000`。
+2. 網站網址的決定順序：`NEXT_PUBLIC_SITE_URL`（使用自訂網域時請設定，例如 `https://your-domain.example`）→ Vercel 自動提供的 `VERCEL_PROJECT_PRODUCTION_URL`（不需設定）→ `http://localhost:3000`。sitemap、robots、canonical 與社群分享圖都會使用此值；正式建置若兩者皆未設定會在建置日誌輸出警告。
 3. 部署。
 
 注意：社群分享圖需要的字型會在建置時從 Google Fonts 下載，因此建置環境必須能連上網路。
