@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { PageSkeleton } from './PageSkeleton';
 
 /**
  * 以 ssr: false 動態載入抽獎頁（伺服器元件不可使用 ssr: false，故包一層客戶端元件）。
@@ -8,15 +9,7 @@ import dynamic from 'next/dynamic';
  */
 const PlayLoader = dynamic(() => import('./PlayClient'), {
   ssr: false,
-  loading: () => (
-    <div className="play">
-      <aside className="panel">
-        <h1>開始抽獎</h1>
-        <p className="message">載入中…</p>
-      </aside>
-      <section className="stage" />
-    </div>
-  ),
+  loading: () => <PageSkeleton title="開始抽獎" variant="setup" />,
 });
 
 export default PlayLoader;
