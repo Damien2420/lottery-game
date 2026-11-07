@@ -36,3 +36,6 @@ next-env.d.ts
 
 # Next.js 開發伺服器自動產生
 AGENTS.md
+
+# Vercel CLI 專案連結
+.vercel
