@@ -9,6 +9,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
+    "test:slow": "vitest run --config vitest.slow.config.ts",
+    "test:all": "vitest run && vitest run --config vitest.slow.config.ts",
     "sim": "tsx scripts/simulate.ts"
   },
   "dependencies": {
