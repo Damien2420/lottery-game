@@ -85,4 +85,4 @@ function buildClassic(mechanisms: readonly string[] = MECHANISM_IDS): Board {
 }
 
 /** 經典台面定義 */
-export const classic: BoardDef = { id: 'classic', name: '經典', version: 13, build: buildClassic };
+export const classic: BoardDef = { id: 'classic', name: '經典', version: 16, build: buildClassic };

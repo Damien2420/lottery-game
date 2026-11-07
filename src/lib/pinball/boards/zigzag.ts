@@ -67,4 +67,4 @@ function buildZigzag(mechanisms: readonly string[] = MECHANISM_IDS): Board {
 }
 
 /** 之字迴廊台面定義 */
-export const zigzag: BoardDef = { id: 'zigzag', name: '之字迴廊', version: 13, build: buildZigzag };
+export const zigzag: BoardDef = { id: 'zigzag', name: '之字迴廊', version: 16, build: buildZigzag };

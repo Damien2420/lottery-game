@@ -1,7 +1,7 @@
 import type Matter from 'matter-js';
 import type { Sfx } from './audio';
 import { getBoard } from './boards';
-import { beltDir, windDir, windGust } from './boards/mechanisms';
+import { beltDir, GATE_H, windDir, windGust } from './boards/mechanisms';
 import type { Board, BoardId } from './boards/types';
 import { MARBLE_R, STEP_MS, WORLD_W } from './physics';
 import { REDRAW_HUE, Simulation, type SimConfig, type SimMarble } from './simulation';
@@ -747,7 +747,8 @@ export class Game {
       ctx.restore();
     });
     // 彈射點：金色粗圈加朝上的小箭頭，看得出會把彈珠往上彈
-    board.mechs.pads.forEach((p, i) => {
+    // 只剩最後一顆彈珠時彈射點停用，不再畫出
+    if (!this.sim?.padsOff()) board.mechs.pads.forEach((p, i) => {
       if (p.y + p.r < top || p.y - p.r > bottom) return;
       // 彈出彈珠的瞬間放大變亮，再慢慢恢復
       const charge = this.sim?.padFlash(i) ?? 0;
@@ -806,14 +807,16 @@ export class Game {
     }
     // 集結池：閘門關著時在閘門上方畫金色進度條，滿了就開閘
     board.mechs.pools.forEach((p, i) => {
-      if (p.closed.y + 20 < top || p.closed.y - 20 > bottom) return;
+      if (p.closed.y + GATE_H < top || p.closed.y - GATE_H > bottom) return;
       const { open, fill } = this.sim?.poolPhase(i) ?? { open: false, fill: 0 };
       if (open) return;
       const w = 90;
+      // 進度條在閘門上緣往上 10
+      const barY = p.closed.y - GATE_H / 2 - 10;
       ctx.fillStyle = `rgb(${C.inkRgb} / 0.15)`;
-      ctx.fillRect(p.closed.x - w / 2, p.closed.y - 16, w, 5);
+      ctx.fillRect(p.closed.x - w / 2, barY, w, 5);
       ctx.fillStyle = C.gold;
-      ctx.fillRect(p.closed.x - w / 2, p.closed.y - 16, w * fill, 5);
+      ctx.fillRect(p.closed.x - w / 2, barY, w * fill, 5);
     });
   }
 
@@ -821,8 +824,11 @@ export class Game {
   private drawSpinner(b: Matter.Body): void {
     const { ctx } = this;
     ctx.fillStyle = C.ink;
-    this.tracePath(b);
-    ctx.fill();
+    // 複合剛體（勺形攪拌棒）逐段畫出，parts[0] 是父剛體本身
+    for (const part of b.parts.length > 1 ? b.parts.slice(1) : [b]) {
+      this.tracePath(part);
+      ctx.fill();
+    }
     ctx.beginPath();
     ctx.arc(b.position.x, b.position.y, 4.5, 0, Math.PI * 2);
     ctx.fillStyle = C.gold;

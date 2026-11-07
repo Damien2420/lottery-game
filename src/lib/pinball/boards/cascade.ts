@@ -101,4 +101,4 @@ function buildCascade(mechanisms: readonly string[] = MECHANISM_IDS): Board {
 }
 
 /** 瀑布台面定義 */
-export const cascade: BoardDef = { id: 'cascade', name: '瀑布', version: 13, build: buildCascade };
+export const cascade: BoardDef = { id: 'cascade', name: '瀑布', version: 16, build: buildCascade };

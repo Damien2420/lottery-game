@@ -73,8 +73,6 @@ const POOL_STACK_PX = (Math.PI * MARBLE_R * MARBLE_R) / 0.6 / WORLD_W;
 const POOL_WAIT = 3600;
 /** 可重複吸引的重力井（終點池）：放開後多少步內不會再吸住同一顆彈珠（約 1.5 秒） */
 const WELL_REGRAB = 90;
-/** 集結池：開閘後維持打開的步數 */
-const POOL_OPEN = 240;
 /** 彈射點：彈出後閃光持續的步數（只影響畫面） */
 const PAD_FLASH = 20;
 /** 彈射點：噴發後多少步內同一個彈射點不再噴（約 0.3 秒） */
@@ -408,7 +406,7 @@ export class Simulation {
       if (Math.abs(next - prev) > FLIP_KICK_OMEGA) this.flipKick(f.body, f.len, next - prev);
     }
     this.movePools();
-    // 台上只剩最後一顆彈珠時，終點出口上方的大十字移走，不再擋住最後一顆
+    // 台上只剩最後一顆彈珠時，終點出口上方的勺形攪拌棒移走、彈射點停用，不再擋住最後一顆
     if (!this.crossGone && this.states.length - this.finishedCount <= 1) {
       this.crossGone = true;
       for (const b of this.board.mechs.finishCross) Body.setPosition(b, { x: GATE_AWAY_X, y: b.position.y });
@@ -416,7 +414,7 @@ export class Simulation {
   }
 
   /**
-   * 集結池開關閘：閘門上方離終點最遠的那顆彈珠也到了池子（上方的彈珠全部到齊）時打開 POOL_OPEN 步；
+   * 集結池開關閘：閘門上方離終點最遠的那顆彈珠也到了池子（上方的彈珠全部到齊）時打開，打開後就不再關上；
    * 第一顆進池後滿 POOL_WAIT 步仍未到齊（例如上方有彈珠卡死）也會打開。
    * 彈珠多到超過漏斗容量時會往上堆，池子的範圍依堆疊高度往上延伸。
    */
@@ -441,7 +439,8 @@ export class Simulation {
           if (st.fill >= 1) {
             st.since = null;
             st.fill = 0;
-            st.openUntil = this.steps + POOL_OPEN;
+            // 開閘後不再關上
+            st.openUntil = Infinity;
           }
         } else {
           st.fill = 0;
@@ -464,6 +463,14 @@ export class Simulation {
    */
   private inClosedPool(y: number): boolean {
     return this.board.mechs.pools.some((p, i) => !this.poolState[i].open && y >= p.top && y < p.bottom);
+  }
+
+  /**
+   * 彈射點是否已停用（台上只剩最後一顆彈珠時），供畫面隱藏彈射點。
+   * @returns 已停用時為 true
+   */
+  padsOff(): boolean {
+    return this.crossGone;
   }
 
   /**
@@ -577,6 +584,7 @@ export class Simulation {
    * 每顆彈珠被彈後 PAD_COOLDOWN 步內不會再被彈；彈出後短暫不受速度上限限制。
    */
   private firePads(): void {
+    if (this.crossGone) return;
     this.board.mechs.pads.forEach((p, i) => {
       const last = this.padFired[i];
       if (last !== undefined && this.steps - last < PAD_REFIRE) return;

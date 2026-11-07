@@ -2,7 +2,7 @@ import Matter from 'matter-js';
 import { MARBLE_R, WORLD_W } from '../physics';
 import type { Spinner } from './types';
 
-const { Bodies, Query } = Matter;
+const { Bodies, Body, Query } = Matter;
 
 /** 圓形區域 */
 export interface Circle {
@@ -78,6 +78,60 @@ export function spinner(x: number, y: number, len: number, speed: number, angle 
  */
 export function wheel(x: number, y: number, len: number, arms: number, speed: number): Spinner[] {
   return Array.from({ length: arms }, (_, k) => spinner(x, y, len, speed, (Math.PI * k) / arms));
+}
+
+/** 勺形攪拌棒臂的厚度 */
+const SCOOP_THICK = 10;
+
+/**
+ * 建立勺形攪拌棒：三支從中心放射、相隔 120 度的臂，末端往旋轉方向彎起成勺狀，勺尖與折角都是圓的。
+ * 實測比較（每種 9 場、60 人）：三臂比四臂在臂與臂之間留出更大的空檔讓彈珠落下，卡住推動從數十次降到約 1 次；
+ * 勺口朝後（凸面在前）會把彈珠一路推回斜坡，最差；縮小半徑讓勺尖不碰牆反而讓出口邊緣的彈珠被反覆往上撥。
+ * 以複合剛體實作，整體繞中心轉動。
+ * @param x 中心 X
+ * @param y 中心 Y
+ * @param reach 最外緣半徑（含臂的厚度）
+ * @param speed 每步旋轉弧度，正值順時針；勺口朝向旋轉方向
+ * @returns 擋板物件
+ */
+export function scoopWheel(x: number, y: number, reach: number, speed: number): Spinner {
+  const curl = speed >= 0 ? 1 : -1;
+  const half = SCOOP_THICK / 2;
+  // 單支臂的折線（臂朝 +X，以勺尖距離為 1 的比例），後兩段往旋轉方向彎
+  const shape = [
+    [0, 0],
+    [0.55, 0],
+    [0.8, 0.09],
+    [0.96, 0.3],
+  ];
+  // 縮放到勺尖圓心距離 + 半個厚度剛好等於 reach
+  const len = (reach - half) / Math.hypot(0.96, 0.3);
+  const parts: Matter.Body[] = [];
+  for (let k = 0; k < 3; k++) {
+    const a = ((Math.PI * 2) / 3) * k;
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
+    const pts = shape.map(([px, py]) => {
+      const lx = px * len;
+      const ly = py * len * curl;
+      return { x: x + lx * cos - ly * sin, y: y + lx * sin + ly * cos };
+    });
+    for (let j = 0; j < pts.length - 1; j++) {
+      const p = pts[j];
+      const q = pts[j + 1];
+      const segLen = Math.hypot(q.x - p.x, q.y - p.y);
+      parts.push(Bodies.rectangle((p.x + q.x) / 2, (p.y + q.y) / 2, segLen, SCOOP_THICK, { label: 'spinner', angle: Math.atan2(q.y - p.y, q.x - p.x) }));
+      // 折角與勺尖補一個圓，接縫不留缺口、勺尖是圓的，彈珠碰到會滑開而不是被尖角卡住
+      parts.push(Bodies.circle(q.x, q.y, half, { label: 'spinner' }));
+    }
+  }
+  const body = Body.create({ parts, label: 'spinner' });
+  Body.setStatic(body, true);
+  Body.setPosition(body, { x, y });
+  body.restitution = STATIC_OPTS.restitution;
+  body.friction = STATIC_OPTS.friction;
+  body.frictionStatic = STATIC_OPTS.frictionStatic;
+  return { body, speed };
 }
 
 /**

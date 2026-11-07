@@ -1,6 +1,6 @@
 import Matter from 'matter-js';
 import { WORLD_W } from '../physics';
-import { bumper, pegField, segment, STATIC_OPTS, wheel } from './builders';
+import { bumper, pegField, scoopWheel, segment, STATIC_OPTS, wheel } from './builders';
 import type { Flipper, MechanismId, Mechs, Spinner } from './types';
 
 export { MECHANISM_IDS, MECHANISM_INFO, type MechanismId } from './types';
@@ -174,10 +174,19 @@ export function mechanismSlot(kind: MechanismId, enabled: boolean, top: number, 
  * @param core 井心半徑
  * @param out 收集靜態物件
  * @param mechs 收集機關資料
+ * @param repeat 是否可重複吸引同一顆彈珠
  */
-function addWell(x: number, y: number, r: number, core: number, out: Parts, mechs: Mechs, repeat = false): void {
+function addWell(
+  x: number,
+  y: number,
+  r: number,
+  core: number,
+  out: Parts,
+  mechs: Mechs,
+  repeat = false,
+): void {
   out.statics.push(Bodies.circle(x, y, core, { ...STATIC_OPTS, restitution: 0.8, label: 'core' }));
-  mechs.wells.push(repeat ? { x, y, r, repeat } : { x, y, r });
+  mechs.wells.push({ x, y, r, ...(repeat ? { repeat } : {}) });
 }
 
 /**
@@ -188,14 +197,40 @@ function addWell(x: number, y: number, r: number, core: number, out: Parts, mech
  * @returns 閘門剛體
  */
 function gateBody(x: number, y: number, w: number): Matter.Body {
-  return Bodies.rectangle(x, y, w, 12, { ...STATIC_OPTS, label: 'gate' });
+  return Bodies.rectangle(x, y, w, GATE_H, { ...STATIC_OPTS, label: 'gate' });
+}
+
+/**
+ * 集結池閘門的厚度。池裡堆了數百顆彈珠時，底層彈珠會被壓進閘門十幾單位深，
+ * 閘門太薄（原本 12）時彈珠中心一旦被壓過閘門中線，碰撞修正就會把它往下推出去（漏球），
+ * 加厚後要壓進超過厚度一半才會發生。
+ */
+export const GATE_H = 36;
+
+/**
+ * 建立集結池的厚斜牆：上表面與一般 12 厚的 segment 相同位置，多出的厚度往牆下方長（理由同 GATE_H，
+ * 高速落下的彈珠撞上池裡的彈珠堆時，會被碰撞修正一次推過 12 厚的斜牆）。
+ * @param x1 起點 X
+ * @param y1 起點 Y
+ * @param x2 終點 X
+ * @param y2 終點 Y
+ * @returns 靜態矩形剛體
+ */
+function poolWall(x1: number, y1: number, x2: number, y2: number): Matter.Body {
+  const len = Math.hypot(x2 - x1, y2 - y1);
+  // 取朝下（Y 為正）的法向量，中心線往下平移，讓上表面維持原位
+  const sign = x2 > x1 ? 1 : -1;
+  const nx = (-(y2 - y1) / len) * sign;
+  const ny = ((x2 - x1) / len) * sign;
+  const shift = (GATE_H - 12) / 2;
+  return segment(x1 + nx * shift, y1 + ny * shift, x2 + nx * shift, y2 + ny * shift, GATE_H);
 }
 
 /** 集結池的高度（區塊頂端到下一段） */
 export const POOL_H = 300;
 
 /**
- * 集結池（固定配置）：兩側斜牆匯向中央，底部以閘門封住，池中央一支雙臂攪拌棒、左右各一支小十字持續把彈珠攪亂。
+ * 集結池（固定配置）：兩側斜牆匯向中央，底部以閘門封住，池中央一支雙臂攪拌棒，左右上方各一支反向旋轉的十字，把彈珠攪亂。
  * 上方的彈珠全部到齊（最落後的那顆也進池）、或第一顆進池後滿時限時，閘門整個打開讓大家一起出發，
  * 把拉長的隊伍重新收成一個大部隊。
  * @param top 區塊頂端 Y
@@ -205,8 +240,10 @@ export const POOL_H = 300;
  * @returns 下一段頂端 Y
  */
 export function regroupPool(top: number, k: number, out: Parts, mechs: Mechs): number {
-  const gate = gateBody(300, top + 206, 110);
-  out.statics.push(segment(0, top, 255, top + 200), segment(WORLD_W, top, WORLD_W - 255, top + 200), gate);
+  // 閘門上緣固定在 top + 200（與斜牆末端齊平），厚度往下長
+  const gateY = top + 200 + GATE_H / 2;
+  const gate = gateBody(300, gateY, 110);
+  out.statics.push(poolWall(0, top, 255, top + 200), poolWall(WORLD_W, top, WORLD_W - 255, top + 200), gate);
   // 攪拌棒中心在 top + 110：扇葉尖端停在出口上方，不會在出口來回把最後幾顆彈珠撥回斜牆
   // （實測壓低反而讓開閘時彈珠在池裡多待 15 到 30 秒，抬高後最多約 3 秒）
   const speed = k % 2 ? -0.045 : 0.045;
@@ -214,13 +251,13 @@ export function regroupPool(top: number, k: number, out: Parts, mechs: Mechs): n
   // 延長臂（長 184，尖端剛好掃過閘門面、碰不到斜牆）與主臂同角度同速旋轉：閘門關著時掃到閘門上的彈珠，開閘時移走
   const arms = wheel(300, top + 110, 184, 2, speed);
   out.spinners.push(...arms);
-  // 左右兩側斜牆上方各一支小十字（半徑 36），與中央反向轉，把進池的彈珠攪亂；
-  // 中心在 top + 10，扇葉尖端與斜牆至少留一顆彈珠的寬度，彈珠不會被夾在扇葉和斜牆之間
-  out.spinners.push(...wheel(110, top + 10, 72, 2, -speed * 1.2), ...wheel(WORLD_W - 110, top + 10, 72, 2, speed * 1.2));
+  // 左右兩側各一支十字（長 120），與中央反向轉。中心抬到 top - 50，扇葉尖端與 V 形斜牆、外框和上一段的機關都至少留一顆彈珠多一點的空隙，
+  // 彈珠不會被夾在扇葉和牆之間；長 150 的十字在之字與瀑布台面會碰到上一段的輸送帶與斜牆，放不下
+  out.spinners.push(...wheel(110, top - 50, 120, 2, -speed * 1.2), ...wheel(WORLD_W - 110, top - 50, 120, 2, speed * 1.2));
   // 池子滿出來時彈珠會往上堆，計數範圍往上多算一段
   mechs.pools.push({
     gate,
-    closed: { x: 300, y: top + 206 },
+    closed: { x: 300, y: gateY },
     top: top - 200,
     bottom: top + 212,
     arms: arms.map((a) => a.body),
@@ -231,7 +268,6 @@ export function regroupPool(top: number, k: number, out: Parts, mechs: Mechs): n
 
 /** 終點池的高度（區塊頂端到終點線） */
 export const FINISH_ZONE_H = 540;
-
 /**
  * 終點池（三種台面共用）：上方三座可重複吸引的重力井，下方是坡度平緩的 V 形池，底部正中央一個常開的窄出口，
  * 出口下方接一段只容 2 到 3 顆彈珠並排的漏斗頸直通終點線。
@@ -259,11 +295,11 @@ export function finishZone(top: number, k: number, on: ReadonlySet<string>, out:
   // 出口下方的漏斗頸：內緣從 52 寬收窄到 46 寬（約 2.5 顆彈珠）一路接到終點線，一次只能並排落下 2 到 3 顆
   const neckY = top + FINISH_ZONE_H;
   out.statics.push(segment(268, bottomY, 271, neckY), segment(WORLD_W - 268, bottomY, WORLD_W - 271, neckY));
-  // 大十字（半徑 60）中心在出口正上方，扇葉尖端掃進出口，當作會轉的閘門；
-  // 中心比出口低一點（bottomY - 44），扇葉能撈到停在出口邊緣的最後一顆
-  const cross = wheel(300, bottomY - 44, 120, 2, k % 2 ? -0.06 : 0.06);
-  out.spinners.push(...cross);
-  mechs.finishCross.push(...cross.map((c) => c.body));
+  // 三臂勺形攪拌棒（最外緣半徑 63）中心在出口正上方，扇葉掃進出口，當作會轉的閘門；
+  // 中心比出口低一點（bottomY - 44），勺口朝旋轉方向，能把停在出口邊緣的彈珠勾起帶走
+  const scoop = scoopWheel(300, bottomY - 44, 63, k % 2 ? -0.06 : 0.06);
+  out.spinners.push(scoop);
+  mechs.finishCross.push(scoop.body);
   // 彈射點貼在斜牆上方：靠牆的一個瞄準側邊重力井，靠中央的一個瞄準中央重力井
   const slope = (bottomY - floorY) / 268;
   for (const [x, tx, ty] of [[86, 105, top + 110], [140, 300, top + 150]]) {

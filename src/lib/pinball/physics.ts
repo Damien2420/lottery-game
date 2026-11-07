@@ -5,7 +5,7 @@
  */
 
 /** 引擎版本，物理參數或步進邏輯變動時調升 */
-export const ENGINE_VERSION = 12;
+export const ENGINE_VERSION = 13;
 /** 固定物理步長（毫秒），與畫面更新率脫鉤 */
 export const STEP_MS = 1000 / 60;
 /** 彈珠半徑 */
