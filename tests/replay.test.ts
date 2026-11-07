@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { checkReplayable, sameWinners } from '@/lib/replay';
+import { getBoard } from '@/lib/pinball/boards';
 import { ENGINE_VERSION } from '@/lib/pinball/physics';
 import type { DrawRecord } from '@/lib/storage/schema';
 
@@ -12,7 +13,7 @@ function rec(over: Partial<DrawRecord> = {}): DrawRecord {
     listTitle: '測試',
     names: ['a', 'b', 'c'],
     boardId: 'classic',
-    boardVersion: 1,
+    boardVersion: getBoard('classic')!.version,
     engineVersion: ENGINE_VERSION,
     winnerCount: 1,
     seed: 1,
@@ -24,7 +25,7 @@ function rec(over: Partial<DrawRecord> = {}): DrawRecord {
 const MSG = '台面或引擎已更新，無法精確重播';
 
 describe('checkReplayable', () => {
-  it('版本相同可重播', () => expect(checkReplayable(rec({ boardVersion: 1, engineVersion: ENGINE_VERSION }))).toEqual({ ok: true }));
+  it('版本相同可重播', () => expect(checkReplayable(rec())).toEqual({ ok: true }));
   it('台面版本不同', () => expect(checkReplayable(rec({ boardVersion: 0 }))).toEqual({ ok: false, message: MSG }));
   it('引擎版本不同', () => expect(checkReplayable(rec({ engineVersion: 0 }))).toEqual({ ok: false, message: MSG }));
   it('台面已不存在', () => expect(checkReplayable(rec({ boardId: 'gone' }))).toEqual({ ok: false, message: MSG }));

@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { validateListForm } from '@/lib/listForm';
-import { MAX_PLAYERS } from '@/lib/pinball/physics';
 import { createList, deleteList, duplicateList, updateList } from '@/lib/storage/ops';
 import { useStoredData } from '@/lib/storage/useStoredData';
 
@@ -38,7 +37,7 @@ export default function ListsClient(): React.JSX.Element {
 
   if (data === null) {
     return (
-      <main className="lists">
+      <main className="page">
         <h1>名單管理</h1>
         <p className="message">載入中…</p>
       </main>
@@ -85,14 +84,14 @@ export default function ListsClient(): React.JSX.Element {
   };
 
   return (
-    <main className="lists">
-      <h1>名單管理</h1>
-      <p className="message">{message}</p>
-      <div>
-        <button type="button" className="secondary" onClick={() => open({ id: null, title: '', text: '' })}>
+    <main className="page">
+      <div className="page-head">
+        <h1>名單管理</h1>
+        <button type="button" onClick={() => open({ id: null, title: '', text: '' })}>
           新增名單
         </button>
       </div>
+      <p className="message" role="status">{message}</p>
       {editor && (
         <section className="editor">
           <h2>{editor.id === null ? '新增名單' : '編輯名單'}</h2>
@@ -104,7 +103,7 @@ export default function ListsClient(): React.JSX.Element {
             onChange={(e) => setEditor({ ...editor, title: e.target.value })}
           />
           <label className="field">
-            <span>參加名單（一行一位，最多 {MAX_PLAYERS} 人）</span>
+            <span>參加名單（一行一位）</span>
             <textarea value={editor.text} onChange={(e) => setEditor({ ...editor, text: e.target.value })} />
           </label>
           {error && (
@@ -123,7 +122,7 @@ export default function ListsClient(): React.JSX.Element {
         </section>
       )}
       {data.lists.length === 0 ? (
-        <p>目前沒有名單，請先新增一份。</p>
+        <p className="empty">目前沒有名單，請先新增一份。</p>
       ) : (
         <ul className="list-rows">
           {data.lists.map((l) => (
@@ -135,18 +134,20 @@ export default function ListsClient(): React.JSX.Element {
                 </span>
               </div>
               <div className="actions">
-                <Link href={`/play?list=${encodeURIComponent(l.id)}`}>用這份名單抽獎</Link>
+                <Link href={`/play?list=${encodeURIComponent(l.id)}`} className="pill small">
+                  用這份名單抽獎
+                </Link>
                 <button
                   type="button"
-                  className="secondary"
+                  className="secondary small"
                   onClick={() => open({ id: l.id, title: l.title, text: l.names.join('\n') })}
                 >
                   編輯
                 </button>
-                <button type="button" className="secondary" onClick={() => duplicate(l.id)}>
+                <button type="button" className="secondary small" onClick={() => duplicate(l.id)}>
                   複製
                 </button>
-                <button type="button" className="secondary" onClick={() => remove(l.id, l.title)}>
+                <button type="button" className="danger small" onClick={() => remove(l.id, l.title)}>
                   刪除
                 </button>
               </div>

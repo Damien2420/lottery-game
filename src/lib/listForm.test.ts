@@ -10,9 +10,8 @@ describe('validateListForm', () => {
     expect(validateListForm('x', '')).toEqual({ ok: true, title: 'x', names: [] });
   });
 
-  it('剛好 200 人可通過，201 人被拒絕', () => {
-    const make = (n: number): string => Array.from({ length: n }, (_, i) => `p${i}`).join('\n');
-    expect(validateListForm('x', make(200)).ok).toBe(true);
-    expect(validateListForm('x', make(201))).toEqual({ ok: false, error: '最多 200 人' });
+  it('人數沒有上限', () => {
+    const names = Array.from({ length: 1000 }, (_, i) => `p${i}`).join('\n');
+    expect(validateListForm('x', names).ok).toBe(true);
   });
 });

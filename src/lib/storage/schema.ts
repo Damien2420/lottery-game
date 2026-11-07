@@ -1,5 +1,11 @@
-import { MAX_PLAYERS } from '@/lib/pinball/physics';
-import { BOARD_IDS, type BoardId } from '@/lib/pinball/boards/types';
+import { MAX_MARBLES_PER_ENTRY, MAX_MARBLES_PER_PERSON } from '@/lib/pinball/physics';
+
+/** 重抽彈珠數的上限（與 draw.ts 的 MAX_REDRAW 相同，這裡另外定義以免儲存層依賴抽獎邏輯） */
+export const MAX_REDRAW = 500;
+import { BOARD_IDS, MECHANISM_IDS, type BoardId } from '@/lib/pinball/boards/types';
+
+/** 遊戲模式（與模擬的 GameMode 相同，這裡另外定義以免儲存層依賴 matter-js） */
+export type DrawMode = 'race' | 'survival';
 
 /** localStorage 使用的單一 key */
 export const STORAGE_KEY = 'pinball-lottery';
@@ -33,15 +39,34 @@ export interface DrawRecord {
   winnerCount: number;
   /** 32 位元無號整數 */
   seed: number;
-  /** 得獎者依抵達順序排列，對應 names 的索引（支援同名） */
+  /** 得獎者依名次排列，對應 names 的索引（支援同名） */
   winners: number[];
+  /** 遊戲模式；省略為競速 */
+  mode?: DrawMode;
+  /** 每人固定的彈珠數；省略為 1 */
+  perPerson?: number;
+  /** 依名單 *X 設定的每人彈珠數，順序同 names；省略時每人使用 perPerson */
+  counts?: number[];
+  /** 重抽彈珠數；省略為 0 */
+  redraw?: number;
+  /** 啟用的可選機關；省略為全部 */
+  mechanisms?: string[];
 }
 
 /** 偏好設定 */
 export interface Preferences {
   lastBoardId?: BoardId;
   sound: boolean;
-  removeWinners: boolean;
+  /** 上次使用的遊戲模式 */
+  mode?: DrawMode;
+  /** 上次設定的每人固定彈珠數 */
+  perPerson?: number;
+  /** 是否每人固定彈珠數（關閉時依名單上的 *X） */
+  fixedPer?: boolean;
+  /** 上次設定的重抽彈珠數 */
+  redraw?: number;
+  /** 上次勾選的可選機關 */
+  mechanisms?: string[];
 }
 
 /** 存入 localStorage 的完整資料 */
@@ -55,14 +80,14 @@ export interface StoredData {
 
 /**
  * 建立一份全新的空資料。
- * @returns 預設偏好為音效開啟、得獎者自動移除的空資料
+ * @returns 預設偏好為音效開啟的空資料
  */
 export function emptyData(): StoredData {
   return {
     schemaVersion: 1,
     lists: [],
     draws: [],
-    preferences: { sound: true, removeWinners: true },
+    preferences: { sound: true },
   };
 }
 
@@ -84,6 +109,31 @@ function isInt(v: unknown): v is number {
 /** 是否為 32 位元無號整數 */
 function isUint32(v: unknown): v is number {
   return isInt(v) && v >= 0 && v <= 0xffffffff;
+}
+
+/** 是否為合法的遊戲模式 */
+function isMode(v: unknown): v is DrawMode {
+  return v === 'race' || v === 'survival';
+}
+
+/** 是否為合法的每人彈珠數 */
+function isPerPerson(v: unknown): v is number {
+  return isInt(v) && v >= 1 && v <= MAX_MARBLES_PER_PERSON;
+}
+
+/** 是否為合法的名單 *X 彈珠數（1 到 MAX_MARBLES_PER_ENTRY） */
+function isEntryCount(v: unknown): v is number {
+  return isInt(v) && v >= 1 && v <= MAX_MARBLES_PER_ENTRY;
+}
+
+/** 是否為合法的重抽彈珠數（0 到 MAX_REDRAW） */
+function isRedraw(v: unknown): v is number {
+  return isInt(v) && v >= 0 && v <= MAX_REDRAW;
+}
+
+/** 是否為已知可選機關組成的陣列（不重複） */
+function isMechanisms(v: unknown): v is string[] {
+  return isStringArray(v) && v.every((m) => (MECHANISM_IDS as readonly string[]).includes(m)) && new Set(v).size === v.length;
 }
 
 /** 是否為已知台面識別碼 */
@@ -118,7 +168,12 @@ function isDraw(v: unknown): boolean {
     !isInt(v.engineVersion) ||
     !isInt(v.winnerCount) ||
     !isUint32(v.seed) ||
-    !Array.isArray(v.winners)
+    !Array.isArray(v.winners) ||
+    !(v.mode === undefined || isMode(v.mode)) ||
+    !(v.perPerson === undefined || isPerPerson(v.perPerson)) ||
+    !(v.counts === undefined || (Array.isArray(v.counts) && v.counts.every(isEntryCount))) ||
+    !(v.redraw === undefined || isRedraw(v.redraw)) ||
+    !(v.mechanisms === undefined || isMechanisms(v.mechanisms))
   ) {
     return false;
   }
@@ -126,7 +181,7 @@ function isDraw(v: unknown): boolean {
   const winners: unknown[] = v.winners;
   return (
     n >= 1 &&
-    n <= MAX_PLAYERS &&
+    (v.counts === undefined || (v.counts as unknown[]).length === n) &&
     v.winnerCount >= 1 &&
     winners.length <= v.winnerCount &&
     winners.every((w) => isInt(w) && w >= 0 && w < n) &&
@@ -152,8 +207,12 @@ export function isStoredData(v: unknown): v is StoredData {
   return (
     isObj(p) &&
     typeof p.sound === 'boolean' &&
-    typeof p.removeWinners === 'boolean' &&
-    (p.lastBoardId === undefined || isBoardId(p.lastBoardId))
+    (p.lastBoardId === undefined || isBoardId(p.lastBoardId)) &&
+    (p.mode === undefined || isMode(p.mode)) &&
+    (p.perPerson === undefined || isPerPerson(p.perPerson)) &&
+    (p.fixedPer === undefined || typeof p.fixedPer === 'boolean') &&
+    (p.redraw === undefined || isRedraw(p.redraw)) &&
+    (p.mechanisms === undefined || isMechanisms(p.mechanisms))
   );
 }
 

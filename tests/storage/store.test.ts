@@ -117,8 +117,23 @@ describe('isStoredData', () => {
   it('接受含名單、紀錄與偏好（有或無 lastBoardId）的資料', () => {
     const d = withDraws(draw());
     expect(isStoredData(d)).toBe(true);
-    const prefs = { sound: false, removeWinners: false, lastBoardId: 'cascade' };
+    const prefs = { sound: false, lastBoardId: 'cascade', mode: 'survival', perPerson: 3, mechanisms: ['wind', 'well'] };
     expect(isStoredData({ ...d, preferences: prefs })).toBe(true);
+  });
+
+  it('驗證模式、每人顆數與機關欄位，彈珠總數沒有上限', () => {
+    expect(isStoredData(withDraws(draw({ mode: 'survival', perPerson: 1, mechanisms: ['wind'] })))).toBe(true);
+    expect(isStoredData(withDraws(draw({ mode: 'x' as never })))).toBe(false);
+    expect(isStoredData(withDraws(draw({ perPerson: 11 })))).toBe(false);
+    expect(isStoredData(withDraws(draw({ mechanisms: ['laser'] })))).toBe(false);
+    const many = Array.from({ length: 21 }, (_, i) => `P${i}`);
+    expect(isStoredData(withDraws(draw({ names: many, perPerson: 10 })))).toBe(true);
+    expect(isStoredData(withDraws(draw({ names: many, perPerson: 10, mode: 'survival' })))).toBe(true);
+    // 依名單顆數與重抽彈珠：counts 長度要等於人數、每格 1 到 500；重抽 0 到 500
+    expect(isStoredData(withDraws(draw({ counts: [1, 500, 2], redraw: 2 })))).toBe(true);
+    expect(isStoredData(withDraws(draw({ counts: [1] })))).toBe(false);
+    expect(isStoredData(withDraws(draw({ counts: [1, 501, 1] })))).toBe(false);
+    expect(isStoredData(withDraws(draw({ redraw: 501 })))).toBe(false);
   });
 
   it('接受未知 boardId 的紀錄（重播時再處理）', () => {
@@ -140,7 +155,6 @@ describe('isStoredData', () => {
     ['engineVersion 非整數', { engineVersion: 0.1 }],
     ['boardId 為空字串', { boardId: '' }],
     ['names 為空', { names: [], winners: [] }],
-    ['names 超過 200', { names: Array.from({ length: 201 }, (_, i) => String(i)) }],
   ])('拒絕不合法紀錄：%s', (_label, over) => {
     expect(isStoredData(withDraws(draw(over)))).toBe(false);
   });
@@ -154,7 +168,7 @@ describe('isStoredData', () => {
   it('未知的 lastBoardId 在 loadData 與 parseImport 時被移除', () => {
     const raw = {
       ...emptyData(),
-      preferences: { sound: true, removeWinners: true, lastBoardId: 'nope' },
+      preferences: { sound: true, lastBoardId: 'nope' },
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(raw));
     expect(loadData()).toEqual(emptyData());

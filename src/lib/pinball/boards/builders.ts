@@ -2,7 +2,7 @@ import Matter from 'matter-js';
 import { MARBLE_R, WORLD_W } from '../physics';
 import type { Spinner } from './types';
 
-const { Bodies } = Matter;
+const { Bodies, Query } = Matter;
 
 /** 圓形區域 */
 export interface Circle {
@@ -12,7 +12,7 @@ export interface Circle {
 }
 
 /** 靜態物件共用的材質參數 */
-export const STATIC_OPTS = { isStatic: true, restitution: 0.3, friction: 0.02, label: 'wall' };
+export const STATIC_OPTS = { isStatic: true, restitution: 0.3, friction: 0.02, frictionStatic: 0, label: 'wall' };
 
 /**
  * 建立兩點之間的斜坡（以旋轉的矩形實作）。
@@ -60,10 +60,24 @@ export function pegField(y0: number, y1: number, gapX: number, gapY: number, r: 
  * @param y 中心 Y
  * @param len 長度
  * @param speed 每步旋轉弧度
+ * @param angle 初始角度（弧度）
  * @returns 擋板物件
  */
-export function spinner(x: number, y: number, len: number, speed: number): Spinner {
-  return { body: Bodies.rectangle(x, y, len, 10, { ...STATIC_OPTS, label: 'spinner' }), speed };
+export function spinner(x: number, y: number, len: number, speed: number, angle = 0): Spinner {
+  return { body: Bodies.rectangle(x, y, len, 10, { ...STATIC_OPTS, label: 'spinner', angle }), speed };
+}
+
+/**
+ * 建立多臂風車：數支共用中心、角度平均錯開的旋轉擋板，轉動時會把彈珠撥回上方或甩向兩側。
+ * @param x 中心 X
+ * @param y 中心 Y
+ * @param len 每支臂（直徑方向）的長度
+ * @param arms 臂數（2 為十字、3 為六芒）
+ * @param speed 每步旋轉弧度
+ * @returns 擋板物件陣列
+ */
+export function wheel(x: number, y: number, len: number, arms: number, speed: number): Spinner[] {
+  return Array.from({ length: arms }, (_, k) => spinner(x, y, len, speed, (Math.PI * k) / arms));
 }
 
 /**
@@ -73,4 +87,105 @@ export function spinner(x: number, y: number, len: number, speed: number): Spinn
  */
 export function bumper(c: Circle): Matter.Body {
   return Bodies.circle(c.x, c.y, c.r, { ...STATIC_OPTS, restitution: 1, label: 'bumper' });
+}
+
+/**
+ * 建立漏斗：兩側牆面往中間下降，在 exitX 處留下寬 exitW 的出口。
+ * @param y 漏斗頂端（牆面處）的 Y
+ * @param exitX 出口中心 X
+ * @param exitW 出口寬度
+ * @param depth 牆面到出口的垂直落差
+ * @returns 兩塊斜坡剛體
+ */
+export function funnel(y: number, exitX: number, exitW: number, depth: number): Matter.Body[] {
+  return [segment(0, y, exitX - exitW / 2, y + depth), segment(WORLD_W, y, exitX + exitW / 2, y + depth)];
+}
+
+/** 牆邊保險桿的半徑（圓心在牆外，只露出一部分） */
+const WALL_BUMPER_R = 22;
+/** 牆邊保險桿圓心與牆面的距離（在牆外） */
+const WALL_BUMPER_OUT = 6;
+
+/**
+ * 沿左右牆加上半嵌在牆內的保險桿，把貼著牆垂直落下的彈珠彈回台面中間。
+ * 左右交錯排列；與保險桿太近的釘子會被移除以保留通道，若與其他物件（斜坡、擋板、轉軸等）重疊則略過該位置。
+ * @param statics 既有的靜態物件（不含外框）
+ * @param spinners 旋轉擋板（以轉動範圍判斷重疊）
+ * @param y0 起始 Y
+ * @param y1 結束 Y
+ * @param pitch 同一側相鄰保險桿的間距
+ * @returns 加入保險桿並移除衝突釘子後的靜態物件
+ */
+export function addWallBumpers(statics: Matter.Body[], spinners: Spinner[], y0: number, y1: number, pitch = 150): Matter.Body[] {
+  let out = statics;
+  for (let y = y0, i = 0; y <= y1; y += pitch / 2, i++) {
+    const c: Circle = { x: i % 2 ? WORLD_W + WALL_BUMPER_OUT : -WALL_BUMPER_OUT, y, r: WALL_BUMPER_R };
+    const probe = Bodies.circle(c.x, c.y, c.r + MARBLE_R * 2 + 4);
+    const others = out.filter((b) => b.label !== 'peg');
+    if (Query.collides(probe, others).length) continue;
+    if (spinners.some((s) => Math.hypot(s.body.position.x - c.x, s.body.position.y - c.y) < spinnerReach(s) + c.r + MARBLE_R * 2)) continue;
+    out = out.filter((b) => b.label !== 'peg' || !Query.collides(probe, [b]).length);
+    out.push(bumper(c));
+  }
+  return out;
+}
+
+/** 旋轉擋板的轉動半徑 */
+function spinnerReach(s: Spinner): number {
+  const b = s.body.bounds;
+  return Math.hypot(b.max.x - b.min.x, b.max.y - b.min.y) / 2;
+}
+
+
+/**
+ * 建立外框：左右牆、天花板、地板。標記為 frame 只影響繪製（位於台面外不必畫出），不影響碰撞。
+ * @param worldH 世界高度
+ * @returns 四面牆剛體
+ */
+export function frame(worldH: number): Matter.Body[] {
+  const opts = { ...STATIC_OPTS, label: 'frame' };
+  return [
+    Bodies.rectangle(-20, worldH / 2, 40, worldH + 200, opts),
+    Bodies.rectangle(WORLD_W + 20, worldH / 2, 40, worldH + 200, opts),
+    Bodies.rectangle(WORLD_W / 2, -20, WORLD_W + 80, 40, opts),
+    Bodies.rectangle(WORLD_W / 2, worldH + 20, WORLD_W + 80, 40, opts),
+  ];
+}
+
+/**
+ * 一段之字下坡：左右交替、幾乎橫跨全寬的平緩長斜坡。
+ * 坡度決定滾動速度（越平緩越慢），不靠阻力拖慢；間距依坡度推算，讓出口落下後有足夠的高度差。
+ * @param y 第一層斜坡高端的 Y
+ * @param shelves 層數
+ * @param slopeDeg 坡度（度）
+ * @param fromLeft 第一層是否由左牆往右下
+ * @param doors 是否在每層斜坡中段加一扇逆向旋轉門
+ * @returns 斜坡、旋轉門與這段之字下坡底部的 Y
+ */
+export function switchbacks(
+  y: number,
+  shelves: number,
+  slopeDeg: number,
+  fromLeft = true,
+  doors = false,
+): { statics: Matter.Body[]; spinners: Spinner[]; bottom: number } {
+  const len = 480;
+  const drop = len * Math.tan((slopeDeg * Math.PI) / 180);
+  // 上一層出口到下一層斜坡至少留 70 的落差
+  const pitch = drop * 0.75 + 70;
+  const statics: Matter.Body[] = [];
+  const spinners: Spinner[] = [];
+  for (let k = 0; k < shelves; k++) {
+    const sy = y + k * pitch;
+    const left = (k % 2 === 0) === fromLeft;
+    const [x1, x2] = left ? [0, len] : [WORLD_W, WORLD_W - len];
+    statics.push(segment(x1, sy, x2, sy + drop));
+    if (doors) {
+      // 旋轉門中心在斜坡上方，臂尖掠過坡面；逆著滾動方向轉，把衝太快的彈珠撥回坡上
+      const t = 0.45 + (k % 3) * 0.1;
+      const dx = len * t;
+      spinners.push(spinner(left ? dx : WORLD_W - dx, sy + drop * t - 52, 80, left ? -0.04 : 0.04));
+    }
+  }
+  return { statics, spinners, bottom: y + (shelves - 1) * pitch + drop };
 }

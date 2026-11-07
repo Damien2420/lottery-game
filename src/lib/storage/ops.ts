@@ -105,17 +105,3 @@ export function setPreferences(d: StoredData, p: Partial<StoredData['preferences
   return { ...d, preferences: { ...d.preferences, ...p } };
 }
 
-/**
- * 從名單移除得獎者，每位得獎者只移除第一筆同名項目（支援同名參加者）。
- * @param names 目前名單
- * @param winnerNames 得獎者姓名
- * @returns 移除後的新陣列
- */
-export function removeWinnersOnce(names: string[], winnerNames: string[]): string[] {
-  const rest = [...names];
-  for (const w of winnerNames) {
-    const i = rest.indexOf(w);
-    if (i >= 0) rest.splice(i, 1);
-  }
-  return rest;
-}

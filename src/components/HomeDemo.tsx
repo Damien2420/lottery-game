@@ -69,7 +69,10 @@ export function HomeDemo(): React.JSX.Element {
 
   return (
     <div ref={boxRef} className={styles.demo} aria-label="抽獎彈珠台示範動畫" role="img">
-      {visible && <PinballCanvas boardId="classic" run={run} sound={false} onDone={onDone} />}
+      {visible && <PinballCanvas boardId="classic" run={run} sound={false} hud onDone={onDone} />}
+      <p className={styles.demoTag}>
+        示範賽：<b>{SAMPLE_NAMES.length} 人抽出 3 名</b>
+      </p>
     </div>
   );
 }

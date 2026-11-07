@@ -30,14 +30,14 @@ describe('drawLock', () => {
   it('Nav 包含所有頁面連結', () => {
     render(createElement(Nav));
     const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/', '/play', '/lists', '/history', '/settings']);
+    expect(hrefs).toEqual(['/', '/lists', '/history', '/settings', '/play']);
   });
 
   it('抽獎中點擊 Nav 連結且取消確認時不換頁', () => {
     render(createElement(Nav));
     setDrawing(true);
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    expect(clickLink('名單管理')).toBe(true);
+    expect(clickLink('名單')).toBe(true);
     expect(confirm).toHaveBeenCalledWith(LEAVE_MESSAGE);
   });
 
@@ -47,7 +47,7 @@ describe('drawLock', () => {
     // 在 document 層阻止預設動作，避免 jsdom 嘗試實際換頁
     const stop = (e: Event): void => e.preventDefault();
     document.addEventListener('click', stop);
-    clickLink('名單管理');
+    clickLink('名單');
     document.removeEventListener('click', stop);
     expect(confirm).not.toHaveBeenCalled();
   });

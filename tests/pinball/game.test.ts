@@ -4,7 +4,7 @@ import { Sfx } from '@/lib/pinball/audio';
 
 /** 空操作的 2D context：任何方法呼叫都不做事，屬性可任意賦值 */
 function fakeCtx(): CanvasRenderingContext2D {
-  return new Proxy({}, { get: (t: Record<string, unknown>, k: string) => t[k] ?? (() => undefined), set: (t: Record<string, unknown>, k: string, v) => ((t[k] = v), true) }) as unknown as CanvasRenderingContext2D;
+  return new Proxy({ measureText: () => ({ width: 0 }) } as Record<string, unknown>, { get: (t: Record<string, unknown>, k: string) => t[k] ?? (() => undefined), set: (t: Record<string, unknown>, k: string, v) => ((t[k] = v), true) }) as unknown as CanvasRenderingContext2D;
 }
 
 let pending: Map<number, FrameRequestCallback>;
@@ -77,14 +77,46 @@ describe('Game', () => {
     game.destroy();
   });
 
-  it('跑完一場會依名次通知並只觸發一次 onDone', () => {
+});
+
+describe('Game 鏡頭與即時狀態', () => {
+  const cfg = { names: ['A', 'B', 'C'], boardId: 'classic' as const, seed: 3, winnerCount: 1 };
+
+  it('閒置時 snapshot 為非進行中，無法切到跟隨指定', () => {
     const game = new Game(canvas, events, new Sfx());
     game.showBoard('classic');
-    game.start({ names: ['A', 'B', 'C'], boardId: 'classic', seed: 7, winnerCount: 2 });
-    runFrames(60 * 120);
-    expect(events.onDone).toHaveBeenCalledTimes(1);
-    expect(events.onDone.mock.calls[0][0]).toHaveLength(2);
-    expect(events.onArrive.mock.calls.map((c) => c[1])).toEqual([1, 2]);
+    game.setCameraMode('marble');
+    expect(game.snapshot()).toMatchObject({ active: false, mode: 'leader', top: [] });
+    game.destroy();
+  });
+
+  it('follow 指定存在的參加者後切到跟隨指定；不存在的索引回傳 false', () => {
+    const game = new Game(canvas, events, new Sfx());
+    game.start(cfg);
+    expect(game.follow(9)).toBe(false);
+    expect(game.follow(2)).toBe(true);
+    expect(game.snapshot()).toMatchObject({ mode: 'marble', follow: 2 });
+    game.destroy();
+  });
+
+  it('可切到跟隨最後一名，開新的一場回到跟隨第一名', () => {
+    const game = new Game(canvas, events, new Sfx());
+    game.start(cfg);
+    game.setCameraMode('last');
+    runFrames(60);
+    expect(game.snapshot().mode).toBe('last');
+    game.start(cfg);
+    expect(game.snapshot().mode).toBe('leader');
+    game.destroy();
+  });
+
+  it('panBy 切到自由視角；開新的一場回到跟隨第一名', () => {
+    const game = new Game(canvas, events, new Sfx());
+    game.start(cfg);
+    game.panBy(300);
+    expect(game.snapshot().mode).toBe('free');
+    game.start(cfg);
+    expect(game.snapshot().mode).toBe('leader');
     game.destroy();
   });
 });

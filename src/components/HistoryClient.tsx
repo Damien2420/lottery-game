@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { PinballCanvas, type PinballRun } from '@/components/PinballCanvas';
+import { describeRules } from '@/lib/draw';
 import { getBoard } from '@/lib/pinball/boards';
 import type { BoardId } from '@/lib/pinball/boards/types';
 import { checkReplayable, sameWinners } from '@/lib/replay';
@@ -54,7 +55,7 @@ export default function HistoryClient(): React.JSX.Element {
 
   if (data === null) {
     return (
-      <main className="lists">
+      <main className="page">
         <h1>歷史紀錄</h1>
         <p className="message">載入中…</p>
       </main>
@@ -72,11 +73,11 @@ export default function HistoryClient(): React.JSX.Element {
     const record = data.draws.find((d) => d.id === id);
     if (!record) {
       return (
-        <main className="lists">
+        <main className="page">
           <h1>歷史紀錄</h1>
-          <p>找不到這筆紀錄</p>
+          <p className="empty">找不到這筆紀錄</p>
           <div>
-            <Link href="/history">回到歷史紀錄</Link>
+            <Link href="/history" className="back">回到歷史紀錄</Link>
           </div>
         </main>
       );
@@ -85,11 +86,11 @@ export default function HistoryClient(): React.JSX.Element {
   }
 
   return (
-    <main className="lists">
+    <main className="page">
       <h1>歷史紀錄</h1>
       <p className="message">{message}</p>
       {data.draws.length === 0 ? (
-        <p>目前沒有抽獎紀錄。</p>
+        <p className="empty">目前沒有抽獎紀錄。</p>
       ) : (
         <ul className="list-rows">
           {data.draws.map((d) => (
@@ -97,13 +98,15 @@ export default function HistoryClient(): React.JSX.Element {
               <div className="info">
                 <strong>{d.listTitle}</strong>
                 <span>
-                  {formatTime(d.createdAt)}，{boardName(d.boardId)}
+                  {formatTime(d.createdAt)}，{boardName(d.boardId)}，{describeRules(d.mode, d.perPerson, d.mechanisms, d.counts, d.redraw)}
                 </span>
                 <span>得獎者：{winnerNames(d).join('、')}</span>
               </div>
               <div className="actions">
-                <Link href={`/history?id=${encodeURIComponent(d.id)}`}>查看與重播</Link>
-                <button type="button" className="secondary" onClick={() => remove(d.id)}>
+                <Link href={`/history?id=${encodeURIComponent(d.id)}`} className="pill secondary small">
+                  查看與重播
+                </Link>
+                <button type="button" className="danger small" onClick={() => remove(d.id)}>
                   刪除
                 </button>
               </div>
@@ -149,12 +152,17 @@ function ReplayView({ record }: { record: DrawRecord }): React.JSX.Element {
       boardId: record.boardId as BoardId,
       seed: record.seed,
       winnerCount: record.winnerCount,
+      mode: record.mode,
+      perPerson: record.perPerson,
+      counts: record.counts,
+      redraw: record.redraw,
+      mechanisms: record.mechanisms,
     });
   };
 
   /** 名額內的彈珠抵達時加入即時名次 */
   const onArrive = (index: number, rank: number): void => {
-    setLive((l) => [...l, { index, rank }]);
+    setLive((l) => [...l, { index, rank }].sort((a, b) => a.rank - b.rank));
   };
 
   /** 重播結束：與紀錄比對 */
@@ -163,58 +171,73 @@ function ReplayView({ record }: { record: DrawRecord }): React.JSX.Element {
     setMismatch(!sameWinners(winners, record.winners));
   };
 
+  const side = (
+    <div className="race-status">
+      <Link href="/history" className="back">
+        回到歷史紀錄
+      </Link>
+      <h1>{record.listTitle}</h1>
+      <p className="message">
+        {formatTime(record.createdAt)}，{boardName(record.boardId)}
+      </p>
+      <p className="message">{describeRules(record.mode, record.perPerson, record.mechanisms, record.counts, record.redraw)}</p>
+      <h2>紀錄排名</h2>
+      <ol className="results">
+        {record.winners.map((w, i) => (
+          <li key={i}>
+            <span className="rank">第 {i + 1} 名</span>
+            {record.names[w]}
+          </li>
+        ))}
+      </ol>
+      {!check.ok && (
+        <p className="message" role="alert">
+          {check.message}
+        </p>
+      )}
+      <label className="check">
+        <input type="checkbox" checked={sound} onChange={(e) => setSound(e.target.checked)} />
+        音效
+      </label>
+      <button type="button" disabled={!check.ok} onClick={replay}>
+        {run ? '重新重播' : '重播'}
+      </button>
+      {finished && mismatch && (
+        <p className="message" role="alert">
+          {MISMATCH}
+        </p>
+      )}
+    </div>
+  );
+
   return (
     <div className="play">
-      <aside className="panel">
-        <h1>歷史紀錄</h1>
-        <Link href="/history">回到歷史紀錄</Link>
-        <p className="message">
-          {record.listTitle}，{formatTime(record.createdAt)}，{boardName(record.boardId)}
-        </p>
-        <h2>紀錄排名</h2>
-        <ol className="results">
-          {record.winners.map((w, i) => (
-            <li key={i}>
-              <span className="rank">第 {i + 1} 名</span>
-              {record.names[w]}
-            </li>
-          ))}
-        </ol>
-        {!check.ok && (
-          <p className="message" role="alert">
-            {check.message}
-          </p>
-        )}
-        <label className="check">
-          <input type="checkbox" checked={sound} onChange={(e) => setSound(e.target.checked)} />
-          音效
-        </label>
-        <button type="button" disabled={!check.ok} onClick={replay}>
-          {run ? '重新重播' : '重播'}
-        </button>
-        {run && (
-          <>
-            <h2>重播名次</h2>
-            <ol className="results">
-              {live.map((r) => (
-                <li key={r.rank}>
-                  <span className="rank">第 {r.rank} 名</span>
-                  {record.names[r.index]}
-                </li>
-              ))}
-            </ol>
-          </>
-        )}
-        {finished && mismatch && (
-          <p className="message" role="alert">
-            {MISMATCH}
-          </p>
-        )}
-      </aside>
       <section className="stage">
-        {check.ok && (
-          <PinballCanvas boardId={record.boardId as BoardId} run={run} sound={sound} onArrive={onArrive} onDone={onDone} />
-        )}
+        <PinballCanvas
+          boardId={(check.ok ? record.boardId : 'classic') as BoardId}
+          run={run}
+          sound={sound}
+          hud
+          controls
+          side={side}
+          results={
+            run && live.length > 0 ? (
+              <>
+                <h2>重播名次</h2>
+                <ol className="results">
+                  {live.map((r) => (
+                    <li key={r.rank}>
+                      <span className="rank">第 {r.rank} 名</span>
+                      {record.names[r.index]}
+                    </li>
+                  ))}
+                </ol>
+              </>
+            ) : undefined
+          }
+          onArrive={onArrive}
+          onDone={onDone}
+        />
       </section>
     </div>
   );

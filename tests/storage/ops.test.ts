@@ -6,7 +6,6 @@ import {
   deleteDraw,
   deleteList,
   duplicateList,
-  removeWinnersOnce,
   setPreferences,
   updateList,
 } from '@/lib/storage/ops';
@@ -30,13 +29,6 @@ function draw(id: string, names: string[]): DrawRecord {
     winners: [0],
   };
 }
-
-describe('removeWinnersOnce', () => {
-  it('同名只移除一筆', () =>
-    expect(removeWinnersOnce(['小明', '小明', '阿美'], ['小明'])).toEqual(['小明', '阿美']));
-  it('不存在的得獎者不影響名單', () =>
-    expect(removeWinnersOnce(['A'], ['Z'])).toEqual(['A']));
-});
 
 describe('ops', () => {
   it('createList 複製傳入陣列', () => {
@@ -104,7 +96,7 @@ describe('ops', () => {
   it('setPreferences 合併偏好且不改動原物件', () => {
     const d = emptyData();
     const next = setPreferences(d, { sound: false, lastBoardId: 'zigzag' });
-    expect(next.preferences).toEqual({ sound: false, removeWinners: true, lastBoardId: 'zigzag' });
+    expect(next.preferences).toEqual({ sound: false, lastBoardId: 'zigzag' });
     expect(d.preferences.sound).toBe(true);
   });
 });
