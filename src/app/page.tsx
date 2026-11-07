@@ -11,7 +11,7 @@ export const metadata: Metadata = { alternates: { canonical: '/' } };
 /** 首頁特色清單 */
 const FEATURES = [
   { title: '免註冊', body: '打開網頁就能用，不需要建立帳號或登入。' },
-  { title: '最多 200 人', body: '一場最多可放 200 位參加者，適合尾牙抽獎與大型活動。' },
+  { title: '人數不設限', body: '一場可放入任意人數的參加者，適合尾牙抽獎與大型活動。' },
   { title: '可重播', body: '每場抽獎都會保留種子，隨時能在歷史紀錄重播同一場結果。' },
   { title: '資料只存在你的瀏覽器', body: '名單與紀錄只放在本機 localStorage，不會上傳到任何伺服器。' },
   {
@@ -22,9 +22,9 @@ const FEATURES = [
 
 /** 使用步驟 */
 const STEPS = [
-  { title: '1. 貼上名單', body: '一行一位，直接從 Excel 或聊天室複製貼上。' },
-  { title: '2. 選台面與名額', body: '挑選台面，設定要抽出幾位得獎者。' },
-  { title: '3. 開始抽獎', body: '按下開始，看彈珠一路滾落，最先抵達終點的就是得獎者。' },
+  { title: '貼上名單', body: '一行一位，直接從 Excel 或聊天室複製貼上。' },
+  { title: '選台面與名額', body: '挑選台面，設定要抽出幾位得獎者。' },
+  { title: '開始抽獎', body: '按下開始，看彈珠一路滾落，最先抵達終點的就是得獎者。' },
 ];
 
 /** FAQPage 結構化資料 */
@@ -67,51 +67,74 @@ export default function Home(): React.JSX.Element {
   return (
     <main className={styles.home}>
       <section className={styles.hero}>
-        <h1>免費線上抽獎彈珠台</h1>
-        <p className={styles.subtitle}>貼上名單就能開抽</p>
-        <p className={styles.lead}>
-          抽獎彈珠台是免費的線上抽獎工具，不論是尾牙抽獎、社團活動或直播抽獎，貼上名單、按下開始，
-          就能讓彈珠決定得獎者，過程公開透明、結果可重播。
-        </p>
-        <Link href="/play" className={styles.cta}>
-          開始抽獎
-        </Link>
+        <div>
+          <h1>
+            抽獎彈珠台，
+            <br />
+            <span>
+              每顆彈珠，
+              <br />
+              都是一位參加者。
+            </span>
+          </h1>
+        </div>
+        <div className={styles.heroSide}>
+          <p className={styles.lead}>
+            不論是尾牙抽獎、社團活動或直播抽獎，貼上名單、按下開始，就能讓彈珠決定得獎者，過程公開透明、結果可重播。
+          </p>
+          <Link href="/play" className="pill">
+            開始抽獎
+          </Link>
+        </div>
       </section>
 
       <HomeDemo />
 
-      <section>
+      <section className={styles.section}>
         <h2>為什麼選擇抽獎彈珠台</h2>
         <ul className={styles.features}>
           {FEATURES.map((f) => (
             <li key={f.title}>
-              <strong>{f.title}</strong>
-              {f.body}
+              <h3>{f.title}</h3>
+              <p>{f.body}</p>
             </li>
           ))}
         </ul>
       </section>
 
-      <section>
+      <section className={styles.section}>
         <h2>三步驟完成線上抽獎</h2>
         <ol className={styles.steps}>
-          {STEPS.map((s) => (
+          {STEPS.map((s, i) => (
             <li key={s.title}>
-              <strong>{s.title}</strong>
-              {s.body}
+              <span className={styles.stepNo}>{String(i + 1).padStart(2, '0')}</span>
+              <h3>{s.title}</h3>
+              <p>{s.body}</p>
             </li>
           ))}
         </ol>
       </section>
 
-      <section className={styles.faq}>
-        <h2>常見問題</h2>
-        {FAQ.map((item) => (
-          <details key={item.q}>
-            <summary>{item.q}</summary>
-            <p>{item.a}</p>
-          </details>
-        ))}
+      <section className={`${styles.section} ${styles.faqSection}`}>
+        <div className={styles.faqHead}>
+          <h2>常見問題</h2>
+          <p>還有疑問？這裡整理了開始抽獎前常被問到的問題。</p>
+        </div>
+        <div className={styles.faq}>
+          {FAQ.map((item) => (
+            <details key={item.q}>
+              <summary>{item.q}</summary>
+              <p>{item.a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      <section className={styles.closing}>
+        <h2>名單準備好了嗎？</h2>
+        <Link href="/play" className="pill">
+          開始抽獎
+        </Link>
       </section>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: toJsonLd(FAQ_JSON_LD) }} />

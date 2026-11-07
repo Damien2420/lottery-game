@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>抽獎彈珠台 原型</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#f3f4f6; --surface:#ffffff; --ink:#0b0c0f; --ink-2:#555b67; --line:#e2e5ea;
+  --board:#eceef2; --peg:#c3c9d4; --gold:#f2a100; --live:#ff3b30;
+  --shadow:0 1px 2px rgb(11 12 15 / .06),0 12px 32px -8px rgb(11 12 15 / .14);
+  --ease:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box;margin:0}
+html{background:var(--ground);color:var(--ink);font-family:"Noto Sans TC",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:#0b0c0f;color:#fff}
+body{min-height:100vh}
+a{color:inherit;text-decoration:none}
+.nav{display:flex;align-items:center;gap:28px;padding:18px clamp(16px,4vw,56px);font-size:15px;font-weight:500}
+.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:18px;letter-spacing:-.02em;margin-right:auto}
+.dot{width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff 0 12%,#ff8a3d 13% 45%,#e1452b 80%);box-shadow:inset 0 -3px 4px rgb(0 0 0 / .18)}
+.nav a.link{color:var(--ink-2)}
+.nav a.link:hover{color:var(--ink)}
+.pill{display:inline-flex;align-items:center;gap:10px;background:var(--ink);color:#fff;border-radius:999px;padding:10px 18px;font-weight:700;transition:transform .25s var(--ease),box-shadow .25s var(--ease)}
+.pill:hover{transform:translateY(-1px);box-shadow:0 8px 20px -6px rgb(11 12 15 / .4)}
+.pill:active{transform:translateY(1px) scale(.98)}
+header.hero{padding:clamp(24px,5vw,64px) clamp(16px,4vw,56px) 28px;display:grid;grid-template-columns:1fr auto;align-items:end;gap:32px}
+h1{font-size:clamp(44px,6.4vw,92px);line-height:1.02;font-weight:900;letter-spacing:-.035em;text-wrap:balance}
+h1 span{color:var(--ink-2)}
+.lede{font-size:18px;line-height:1.65;color:var(--ink-2);max-width:30ch}
+.stage{position:relative;margin:0 clamp(16px,4vw,56px);height:min(72vh,720px);border-radius:28px;background:var(--board);overflow:hidden}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.panel{position:absolute;background:var(--surface);border-radius:16px;box-shadow:var(--shadow)}
+.form{left:20px;top:20px;bottom:20px;width:300px;padding:20px;display:flex;flex-direction:column;gap:14px}
+.form h2{font-size:17px;font-weight:900;letter-spacing:-.01em}
+textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:12px;padding:12px 14px;font:inherit;font-size:15px;line-height:1.7;color:var(--ink);background:#fafbfc;outline:none;transition:border-color .2s}
+textarea:focus{border-color:var(--ink)}
+.row{display:flex;align-items:center;justify-content:space-between;font-size:14px;color:var(--ink-2)}
+.stepper{display:flex;align-items:center;background:var(--ground);border-radius:999px;padding:3px}
+.stepper button{width:30px;height:30px;border:0;border-radius:50%;background:transparent;font-size:18px;font-weight:700;cursor:pointer}
+.stepper button:hover{background:#fff}
+.stepper b{width:34px;text-align:center;font-variant-numeric:tabular-nums;color:var(--ink)}
+.boards{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.boards button{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 4px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.boards button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.go{justify-content:center;font-size:17px;padding:14px;border:0;cursor:pointer}
+.lb{right:20px;top:20px;width:250px;padding:14px 16px}
+.lb header{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:8px}
+.live{display:inline-flex;align-items:center;gap:6px;color:var(--live)}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--live);animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.lb ol{list-style:none;padding:0;display:grid;gap:4px}
+.lb li{display:grid;grid-template-columns:26px 18px 1fr;align-items:center;gap:8px;font-weight:700;font-size:16px;height:30px;transition:transform .4s var(--ease)}
+.lb li .r{font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:14px}
+.lb li:first-child .r{color:#a86b00}
+.lb li .m{width:16px;height:16px;border-radius:50%}
+.timer{right:290px;top:20px;padding:10px 16px;font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.mini{right:20px;bottom:20px;width:120px;height:230px;padding:8px}
+.mini canvas{position:static;width:104px;height:214px;border-radius:10px}
+.cams{left:340px;bottom:20px;display:flex;padding:4px;gap:2px}
+.cams button{border:0;background:transparent;border-radius:12px;padding:8px 14px;font:inherit;font-size:14px;font-weight:700;color:var(--ink-2);cursor:pointer}
+.cams button[aria-pressed=true]{background:var(--ink);color:#fff}
+section.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(24px,4vw,64px);padding:96px clamp(16px,4vw,56px) 120px}
+.facts h3{font-size:28px;font-weight:900;letter-spacing:-.02em;margin-bottom:12px}
+.facts p{color:var(--ink-2);line-height:1.75;font-size:16px;max-width:34ch}
+</style>
+</head>
+<body>
+<nav class="nav"><a class="brand" href="#"><span class="dot"></span>抽獎彈珠台</a>
+<a class="link" href="#">名單</a><a class="link" href="#">歷史紀錄</a><a class="link" href="#">備份</a>
+<a class="pill" href="#">開始抽獎</a></nav>
+<header class="hero">
+<h1>每顆彈珠，<br><span>都是一位參加者。</span></h1>
+<p class="lede">貼上名單、選個台面，看兩百顆彈珠撞過擋板衝向終點。每一場都能用種子重播，結果經得起質疑。</p>
+</header>
+<main class="stage" aria-label="彈珠台示範">
+<canvas id="c"></canvas>
+<form class="panel form" onsubmit="return false">
+<h2>參加名單</h2>
+<textarea id="names" spellcheck="false">陳怡君
+林冠宇
+黃佳穎
+張承翰
+李淑芬
+王俊傑
+吳宜蓁
+劉家豪
+蔡雅婷
+楊志明
+許欣怡
+鄭建宏</textarea>
+<div class="row">抽出名額<div class="stepper"><button type="button">−</button><b>3</b><button type="button">+</button></div></div>
+<div class="boards"><button type="button" aria-pressed="true">經典</button><button type="button">之字迴廊</button><button type="button">瀑布</button></div>
+<button class="pill go" type="button">開始抽獎</button>
+</form>
+<div class="panel timer" id="timer">00:00.0</div>
+<div class="panel lb"><header><span>即時名次</span><span class="live"><i></i>LIVE</span></header><ol id="lb"></ol></div>
+<div class="panel cams"><button aria-pressed="true">跟隨第一名</button><button>跟隨指定</button><button>自由視角</button></div>
+<div class="panel mini"><canvas id="mini"></canvas></div>
+</main>
+<section class="facts">
+<div><h3>可重播驗證</h3><p>開始時以瀏覽器密碼學亂數產生種子，同一個種子永遠跑出同一場比賽。</p></div>
+<div><h3>兩百人也清楚</h3><p>鏡頭可跟隨第一名或任何一顆彈珠，右下角的地圖讓觀眾隨時看懂全局。</p></div>
+<div><h3>資料不離開電腦</h3><p>名單與紀錄只存在你的瀏覽器，免註冊，不上傳。</p></div>
+</section>
+<script>
+const names=document.getElementById('names').value.split('\n');
+const hues=[8,32,48,140,170,200,220,262,290,330,100,18];
+const W=600,H=2400;
+const pegs=[];for(let y=300;y<2200;y+=56){const off=(y/56)%2?28:0;for(let x=40+off;x<W-20;x+=56){if(Math.random()<.82)pegs.push({x,y,r:6})}}
+const bars=[{x:150,y:700,len:120,a:0,s:.03},{x:450,y:700,len:120,a:1,s:-.03},{x:300,y:1100,len:150,a:0,s:.04},{x:150,y:1500,len:120,a:0,s:-.035},{x:450,y:1500,len:120,a:2,s:.035},{x:300,y:1900,len:150,a:1,s:-.04}];
+let ms=names.map((n,i)=>({n,x:60+i*40,y:40+(i%3)*20,vx:0,vy:0,h:hues[i%hues.length],done:false}));
+const c=document.getElementById('c'),ctx=c.getContext('2d'),mc=document.getElementById('mini'),mx=mc.getContext('2d');
+let cam=0,t0=performance.now();
+function fit(){const r=c.getBoundingClientRect();c.width=r.width*devicePixelRatio;c.height=r.height*devicePixelRatio;mc.width=104*devicePixelRatio;mc.height=214*devicePixelRatio}
+addEventListener('resize',fit);fit();
+function step(){for(const b of bars)b.a+=b.s;for(const m of ms){if(m.done)continue;m.vy+=.18;m.vx*=.995;m.x+=m.vx;m.y+=m.vy;if(m.x<10){m.x=10;m.vx=Math.abs(m.vx)}if(m.x>W-10){m.x=W-10;m.vx=-Math.abs(m.vx)}
+for(const p of pegs){const dx=m.x-p.x,dy=m.y-p.y,d=Math.hypot(dx,dy);if(d<p.r+9){const nx=dx/d,ny=dy/d;m.x=p.x+nx*(p.r+9);m.y=p.y+ny*(p.r+9);const dot=m.vx*nx+m.vy*ny;m.vx-=1.5*dot*nx;m.vy-=1.5*dot*ny;m.vx+=(Math.random()-.5)*.6}}
+for(const b of bars){const cx=Math.cos(b.a),sy=Math.sin(b.a);const px=m.x-b.x,py=m.y-b.y;const tt=Math.max(-b.len/2,Math.min(b.len/2,px*cx+py*sy));const qx=b.x+cx*tt,qy=b.y+sy*tt;const dx=m.x-qx,dy=m.y-qy,d=Math.hypot(dx,dy);if(d<15){const nx=dx/d,ny=dy/d;m.x=qx+nx*15;m.y=qy+ny*15;const dot=m.vx*nx+m.vy*ny;m.vx-=1.6*dot*nx;m.vy-=1.6*dot*ny;m.vx+=-b.s*tt*.4}}
+if(m.vy>7)m.vy=7;if(m.y>2260){m.done=true;m.at=performance.now()}}
+for(let i=0;i<ms.length;i++)for(let j=i+1;j<ms.length;j++){const a=ms[i],b=ms[j];if(a.done||b.done)continue;const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d<18&&d>0){const o=(18-d)/2,nx=dx/d,ny=dy/d;a.x-=nx*o;a.y-=ny*o;b.x+=nx*o;b.y+=ny*o}}}
+function marble(g,x,y,r,h){const gr=g.createRadialGradient(x-r*.35,y-r*.4,r*.1,x,y,r);gr.addColorStop(0,'#fff');gr.addColorStop(.18,`hsl(${h} 90% 68%)`);gr.addColorStop(1,`hsl(${h} 75% 40%)`);g.fillStyle=gr;g.beginPath();g.arc(x,y,r,0,7);g.fill()}
+function draw(){const dpr=devicePixelRatio,w=c.width/dpr,h=c.height/dpr;const s=Math.min(1,(h)/760),bw=W*s,ox=(w-bw)/2+40;
+const live=ms.filter(m=>!m.done);const lead=live.sort((a,b)=>b.y-a.y)[0];if(lead){const target=Math.max(0,Math.min(H-h/s,lead.y-h/s*.55));cam+=(target-cam)*.06}
+ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle="#e4e7ec";ctx.fillRect(0,0,w,h);ctx.save();ctx.translate(ox,-cam*s);ctx.scale(s,s);
+ctx.fillStyle='#eceef2';ctx.beginPath();ctx.roundRect(0,0,W,H,24);ctx.fill();
+ctx.fillStyle='#c3c9d4';for(const p of pegs){ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill()}
+for(const b of bars){ctx.save();ctx.translate(b.x,b.y);ctx.rotate(b.a);ctx.fillStyle='#0b0c0f';ctx.beginPath();ctx.roundRect(-b.len/2,-6,b.len,12,6);ctx.fill();ctx.fillStyle='#f2a100';ctx.beginPath();ctx.arc(0,0,5,0,7);ctx.fill();ctx.restore()}
+for(let x=0;x<W;x+=20){for(let r=0;r<2;r++){ctx.fillStyle=((x/20+r)%2)?'#0b0c0f':'#fff';ctx.fillRect(x,2270+r*20,20,20)}}
+ctx.font='700 13px "Noto Sans TC"';ctx.textAlign='center';
+for(const m of ms){if(m.done)continue;marble(ctx,m.x,m.y,9,m.h);if(m===lead){ctx.strokeStyle='#0b0c0f';ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(m.x,m.y,13,0,7);ctx.stroke()}ctx.fillStyle='#0b0c0f';ctx.fillText(m.n,m.x,m.y-16)}
+ctx.restore();
+mx.setTransform(dpr,0,0,dpr,0,0);const ms2=104/W;mx.fillStyle='#eceef2';mx.fillRect(0,0,104,214);const ks=214/H;mx.fillStyle='#c3c9d4';for(const p of pegs)mx.fillRect(p.x*ms2,p.y*ks,1.2,1.2);
+mx.strokeStyle='#0b0c0f';mx.lineWidth=1.5;mx.strokeRect(1,cam*ks,102,(h/s)*ks);for(const m of ms){if(m.done)continue;mx.fillStyle=`hsl(${m.h} 80% 50%)`;mx.beginPath();mx.arc(m.x*ms2,m.y*ks,2.4,0,7);mx.fill()}
+const order=[...ms.filter(m=>m.done).sort((a,b)=>a.at-b.at),...live];document.getElementById('lb').innerHTML=order.slice(0,5).map((m,i)=>`<li><span class="r">${String(i+1).padStart(2,'0')}</span><span class="m" style="background:hsl(${m.h} 80% 55%)"></span>${m.n}</li>`).join('');
+const el=(performance.now()-t0)/1000;document.getElementById('timer').textContent=`${String(Math.floor(el/60)).padStart(2,'0')}:${(el%60).toFixed(1).padStart(4,'0')}`;
+if(ms.every(m=>m.done)){ms.forEach((m,i)=>{m.done=false;m.x=60+i*40;m.y=40+(i%3)*20;m.vx=m.vy=0});t0=performance.now();cam=0}}
+function loop(){step();step();draw();requestAnimationFrame(loop)}loop();
+</script>
+</body>
+</html>

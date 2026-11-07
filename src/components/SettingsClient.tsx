@@ -19,7 +19,7 @@ export default function SettingsClient(): React.JSX.Element {
 
   if (data === null) {
     return (
-      <main className="lists">
+      <main className="page">
         <h1>備份設定</h1>
         <p className="message">載入中…</p>
       </main>
@@ -68,9 +68,9 @@ export default function SettingsClient(): React.JSX.Element {
   };
 
   return (
-    <main className="lists">
+    <main className="page">
       <h1>備份設定</h1>
-      <p>資料只存在這個瀏覽器，換電腦請用匯出／匯入</p>
+      <p className="lede">資料只存在這個瀏覽器，換電腦請用匯出／匯入</p>
       <section className="editor">
         <h2>匯出</h2>
         <div className="actions">

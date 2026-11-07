@@ -1,0 +1,53 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "ai-color-palette",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/canon.html"
+        ],
+        "createdAt": "2026-11-06T05:53:01.597Z",
+        "reason": "assistant decision: canon.html is a throwaway decision sketch that deliberately depicts the category-standard look; it never ships"
+      },
+      {
+        "rule": "gradient-text",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/canon.html"
+        ],
+        "createdAt": "2026-11-06T05:53:02.096Z",
+        "reason": "assistant decision: canon.html is a throwaway decision sketch that deliberately depicts the category-standard look; it never ships"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/canon.html"
+        ],
+        "createdAt": "2026-11-06T05:53:02.629Z",
+        "reason": "assistant decision: canon.html is a throwaway decision sketch that deliberately depicts the category-standard look; it never ships"
+      },
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/canon.html"
+        ],
+        "createdAt": "2026-11-06T05:53:03.195Z",
+        "reason": "assistant decision: canon.html is a throwaway decision sketch that deliberately depicts the category-standard look; it never ships"
+      },
+      {
+        "rule": "pulsing-dot",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/proto-home.html"
+        ],
+        "createdAt": "2026-11-06T06:06:36.057Z",
+        "reason": "assistant decision: the LIVE dot only shows while a race is actually running and its ranks update every frame"
+      }
+    ]
+  }
+}

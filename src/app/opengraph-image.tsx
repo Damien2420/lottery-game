@@ -28,7 +28,7 @@ async function loadFont(text: string): Promise<ArrayBuffer> {
 }
 
 /**
- * 產生社群分享用的 Open Graph 圖片（1200x630、深色底、大字標題）。
+ * 產生社群分享用的 Open Graph 圖片（1200x630、淺灰底、墨色大字標題）。
  * @returns PNG 圖片回應
  */
 export default async function OpengraphImage(): Promise<ImageResponse> {
@@ -43,13 +43,13 @@ export default async function OpengraphImage(): Promise<ImageResponse> {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#0b1020',
-          color: '#e6e9f5',
+          background: '#f3f4f6',
+          color: '#0b0c0f',
           fontFamily: 'Noto Sans TC',
         }}
       >
-        <div style={{ fontSize: 180, fontWeight: 700, color: '#ff5c8a', display: 'flex' }}>{TITLE}</div>
-        <div style={{ fontSize: 56, marginTop: 24, color: '#9fb3ff', display: 'flex' }}>{SUBTITLE}</div>
+        <div style={{ fontSize: 180, fontWeight: 700, color: '#0b0c0f', display: 'flex' }}>{TITLE}</div>
+        <div style={{ fontSize: 56, marginTop: 24, color: '#555b67', display: 'flex' }}>{SUBTITLE}</div>
       </div>
     ),
     { ...size, fonts: [{ name: 'Noto Sans TC', data: font, weight: 700, style: 'normal' }] },

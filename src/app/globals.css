@@ -1,3 +1,70 @@
+/*
+ * 全站樣式：遊戲 HUD 的手感 × Apple 式的留白與材質。
+ * 明亮冷灰底、白色浮起面板、墨黑膠囊按鈕；金色只給第一名與轉軸，紅色只給 LIVE。
+ */
+:root {
+  --ground: #f3f4f6;
+  --surface: #ffffff;
+  --field: #fafbfc;
+  --ink: #0b0c0f;
+  --ink-2: #555b67;
+  --ink-3: #8a909b;
+  --line: #e2e5ea;
+  --board: #eceef2;
+  --peg: #c3c9d4;
+  --gold: #f2a100;
+  --gold-ink: #a86b00;
+  --live: #ff3b30;
+  --danger: #d70015;
+  --shadow: 0 1px 2px rgb(11 12 15 / 0.06), 0 12px 32px -8px rgb(11 12 15 / 0.14);
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --nav-h: 64px;
+  --gutter: clamp(16px, 4vw, 56px);
+  --radius: 16px;
+  /* 墨黑底上的文字、開關圓鈕、停用與遮罩：深色模式會重新對應 */
+  --on-ink: #ffffff;
+  --gold-wash: var(--gold-wash);
+  --switch-off: #d5d9df;
+  --disabled: #c9cdd4;
+  --on-disabled: #ffffff;
+  --knob: #ffffff;
+  --knob-on: #ffffff;
+  --shadow-lift: 0 2px 4px rgb(11 12 15 / 0.08), 0 32px 64px -16px rgb(11 12 15 / 0.32);
+  --scrim: rgb(11 12 15 / 0.42);
+  color-scheme: light;
+}
+
+/*
+ * 深色模式：深石墨底、面板比底色亮一階表現浮起，墨黑角色反轉為淺色（主要按鈕是淺色膠囊配深色字）。
+ * 金色仍只給第一名，金色文字改用較亮的金以維持對比。由 <html data-theme="dark"> 啟用。
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0e1014;
+  --surface: #1a1d23;
+  --field: #14171c;
+  --ink: #eef1f5;
+  --ink-2: #a3aab6;
+  --ink-3: #767d8b;
+  --line: #2b3039;
+  --board: #15181d;
+  --peg: #3e4450;
+  --gold: #f2a100;
+  --gold-ink: #ffc24d;
+  --gold-wash: #3a2c0e;
+  --live: #ff453a;
+  --danger: #ff6b6b;
+  --on-ink: #0e1014;
+  --switch-off: #3a404b;
+  --disabled: #30353e;
+  --on-disabled: #7b8290;
+  --knob: #ffffff;
+  --knob-on: #0e1014;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px -8px rgb(0 0 0 / 0.65);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.5), 0 32px 64px -16px rgb(0 0 0 / 0.8);
+  --scrim: rgb(0 0 0 / 0.62);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -5,44 +72,266 @@
 html,
 body {
   margin: 0;
-  height: 100%;
-  background: #0b1020;
-  color: #e6e9f5;
-  font-family: system-ui, "Microsoft JhengHei", "PingFang TC", sans-serif;
+  min-height: 100%;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-sans), "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-.panel {
+::selection {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+/* ---------- 導覽列 ---------- */
+.nav {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 20px;
-  overflow-y: auto;
-  background: #111831;
-  border-right: 1px solid #222c50;
-}
-
-h1 {
-  margin: 0 0 4px;
-  font-size: 22px;
-}
-
-h2 {
-  margin: 8px 0 6px;
+  align-items: center;
+  gap: 4px 28px;
+  min-height: var(--nav-h);
+  padding: 0 var(--gutter);
   font-size: 15px;
-  color: #9fb3ff;
+  font-weight: 500;
 }
 
-.field {
+.nav a {
+  text-decoration: none;
+}
+
+.nav .brand {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
+  margin-right: auto;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.marble-dot {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #fff 0 12%, #ff8a3d 13% 45%, #e1452b 80%);
+  box-shadow: inset 0 -3px 4px rgb(0 0 0 / 0.18);
+}
+
+/* 深淺色切換：與導覽連結同高的圓形按鈕，不搶「開始抽獎」的視線 */
+.theme-toggle {
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+  background: transparent;
+  color: var(--ink-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.theme-toggle:hover:not(:disabled) {
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink-3);
+}
+
+.nav .link {
+  color: var(--ink-2);
+  transition: color 0.2s;
+}
+
+.nav .link:hover,
+.nav .link[aria-current="page"] {
+  color: var(--ink);
+}
+
+.nav .link[aria-current="page"] {
+  font-weight: 700;
+}
+
+@media (max-width: 520px) {
+  .nav {
+    gap: 4px 12px;
+    font-size: 14px;
+  }
+
+  /* 窄螢幕加了深淺色切換後空間吃緊：連結不換行、按鈕縮小 */
+  .nav a {
+    white-space: nowrap;
+  }
+
+  .nav .pill {
+    padding: 0 14px;
+  }
+
+  .theme-toggle {
+    width: 36px;
+    min-height: 36px;
+  }
+
+  .nav .brand-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
+/* ---------- 按鈕 ---------- */
+button,
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    transform 0.25s var(--ease),
+    box-shadow 0.25s var(--ease),
+    background-color 0.2s;
+}
+
+button:hover:not(:disabled),
+.pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -6px rgb(11 12 15 / 0.4);
+}
+
+button:active:not(:disabled),
+.pill:active {
+  transform: translateY(1px) scale(0.98);
+  box-shadow: none;
+}
+
+button:disabled {
+  background: var(--disabled);
+  color: var(--on-disabled);
+  cursor: not-allowed;
+}
+
+button.secondary,
+.pill.secondary {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+button.secondary:hover:not(:disabled),
+.pill.secondary:hover {
+  box-shadow:
+    inset 0 0 0 1px var(--ink-3),
+    0 6px 16px -8px rgb(11 12 15 / 0.3);
+}
+
+button.danger {
+  background: var(--surface);
+  color: var(--danger);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+button.small,
+.pill.small {
+  min-height: 36px;
+  padding: 0 14px;
   font-size: 14px;
 }
 
+.nav .pill {
+  min-height: 40px;
+  padding: 0 18px;
+  font-size: 15px;
+}
+
+/* 分段切換：墨黑表示選取 */
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--ground);
+}
+
+.segmented button {
+  flex: 1;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.segmented button:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
+.segmented button:not([aria-pressed="true"]):hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+.segmented button:disabled {
+  background: transparent;
+  color: var(--ink-3);
+}
+
+/* 閒置時仍要看得出預設選取的模式 */
+.segmented button[aria-pressed="true"]:disabled {
+  background: var(--ink);
+  color: var(--on-ink);
+  opacity: 0.45;
+}
+
+/* ---------- 表單 ---------- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.field > span {
+  display: flex;
+  justify-content: space-between;
+}
+
 .field em {
-  float: right;
   font-style: normal;
-  color: #8a93b8;
+  font-weight: 500;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
 }
 
 .field.inline {
@@ -51,194 +340,1282 @@ h2 {
   justify-content: space-between;
 }
 
+.field.row {
+  flex-direction: row;
+  gap: 8px;
+}
+
+.field.row input {
+  flex: 1;
+  min-width: 0;
+}
+
 textarea,
-input[type="number"] {
-  background: #0b1020;
-  color: inherit;
-  border: 1px solid #2c3866;
-  border-radius: 6px;
-  padding: 8px;
+input[type="text"],
+input[type="number"],
+input[type="search"] {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--field);
+  color: var(--ink);
   font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+textarea:focus,
+input:focus {
+  border-color: var(--ink);
 }
 
 textarea {
-  resize: vertical;
   min-height: 160px;
+  resize: vertical;
+  line-height: 1.7;
+}
+
+/* 自訂下拉選單：收起時與輸入框同一外觀，展開的清單是一塊白色浮起面板 */
+.dropdown {
+  position: relative;
+}
+
+.dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--field);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.dropdown-trigger:hover {
+  border-color: var(--ink-3);
+}
+
+.dropdown-trigger:focus-visible,
+.dropdown[data-open] .dropdown-trigger {
+  border-color: var(--ink);
+  outline: none;
+}
+
+.dropdown-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-meta {
+  flex: none;
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dropdown-chevron {
+  flex: none;
+  color: var(--ink-2);
+  transition: transform 0.25s var(--ease);
+}
+
+.dropdown[data-open] .dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.dropdown-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 288px;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  outline: none;
+  transform-origin: top center;
+  animation: dropdown-in 0.18s var(--ease);
+  scrollbar-width: thin;
+  scrollbar-color: var(--peg) transparent;
+}
+
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+.dropdown-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dropdown-option[data-active] {
+  background: var(--ground);
+}
+
+/* 選取狀態沿用全站規則：墨黑底白字 */
+.dropdown-option[aria-selected="true"] {
+  background: var(--ink);
+  color: var(--on-ink);
+  font-weight: 700;
+}
+
+.dropdown-option[aria-selected="true"] .dropdown-meta {
+  color: color-mix(in srgb, var(--on-ink) 70%, transparent);
 }
 
 input[type="number"] {
-  width: 90px;
+  width: 96px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
+/* 名額加減器 */
+.stepper {
+  display: flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--ground);
+}
+
+.stepper button {
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  font-size: 18px;
+}
+
+.stepper button:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  background: var(--surface);
+}
+
+.stepper input[type="number"] {
+  width: 56px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-weight: 900;
+  appearance: textfield;
+}
+
+.stepper output {
+  min-width: 40px;
+  font-size: 15px;
+  font-weight: 900;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepper input::-webkit-inner-spin-button,
+.stepper input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+/* 開關：取代原生核取方塊 */
 .check {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
   font-size: 14px;
-}
-
-button {
-  padding: 12px;
-  border: 0;
-  border-radius: 8px;
-  background: #ff5c8a;
-  color: #fff;
-  font-size: 16px;
-  font-weight: 700;
+  font-weight: 500;
+  color: var(--ink-2);
   cursor: pointer;
 }
 
-button:disabled {
-  background: #4a4f6a;
-  cursor: not-allowed;
-}
-
-.message {
-  min-height: 1.2em;
-  margin: 0;
-  font-size: 14px;
-  color: #ffd166;
-}
-
-.results {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 14px;
-}
-
-.results li {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  margin-bottom: 4px;
-  border-radius: 6px;
-  background: #18214a;
-}
-
-.results .rank {
-  min-width: 3.5em;
-  color: #ffd166;
-  font-weight: 700;
-}
-
-.stage {
+.check input {
+  flex: none;
+  order: 2;
+  appearance: none;
   position: relative;
-  overflow: hidden;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--switch-off);
+  cursor: pointer;
+  transition: background-color 0.25s var(--ease);
 }
 
-.stage canvas {
-  display: block;
+.check input::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--knob);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  transition: transform 0.25s var(--ease);
 }
 
-/* 全站導覽列 */
-.nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  min-height: 44px;
-  padding: 0 20px;
-  align-items: center;
-  background: #111831;
-  border-bottom: 1px solid #222c50;
-  font-size: 14px;
+.check input:checked {
+  background: var(--ink);
 }
 
-.nav a {
-  color: #9fb3ff;
-  text-decoration: none;
-}
-
-.nav a:hover {
-  color: #fff;
-}
-
-/* 抽獎頁版面：扣除導覽列高度 */
-.play {
-  display: grid;
-  grid-template-columns: 320px 1fr;
-  height: calc(100vh - 44px);
+.check input:checked::after {
+  background: var(--knob-on);
+  transform: translateX(18px);
 }
 
 .fields {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-select,
-input[type="text"] {
-  background: #0b1020;
-  color: inherit;
-  border: 1px solid #2c3866;
-  border-radius: 6px;
-  padding: 8px;
-  font: inherit;
+.message {
+  min-height: 1.2em;
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-2);
 }
 
-button.secondary {
-  padding: 8px;
-  background: #2c3866;
+.message[role="alert"],
+.message.warn {
+  color: var(--danger);
+}
+
+/* ---------- 抽獎頁與重播頁：彈珠台占滿舞台，左側參加名單、右側名次與全場進度軌 ---------- */
+.play {
+  position: relative;
+  height: calc(100vh - var(--nav-h));
+  min-height: 560px;
+  margin: 0 var(--gutter) var(--gutter);
+  border-radius: 28px;
+  background: var(--board);
+  overflow: hidden;
+  --hud-left: 300px;
+  --board-left: 300px;
+  --board-right: 330px;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--live);
+}
+
+.status i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--live);
+  animation: live-pulse 1.4s infinite;
+}
+
+/* 本輪結果：名次大、名字大，直播縮小後仍看得清楚 */
+.results {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.results li {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--ground);
+  font-size: 17px;
+  font-weight: 900;
+  animation: result-in 0.5s var(--ease);
+}
+
+.results .rank {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.results li:first-child {
+  background: var(--gold-wash);
+}
+
+.results li:first-child .rank {
+  color: var(--gold-ink);
+}
+
+.panel-actions {
+  display: grid;
+  gap: 8px;
+}
+
+/* ---------- 得獎名單視窗：全部彈珠抵達時跳出 ---------- */
+.winners {
+  width: min(480px, calc(100% - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 48px);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
+}
+
+.winners[open] {
+  animation: winners-in 0.45s var(--ease);
+}
+
+.winners::backdrop {
+  background: var(--scrim);
+  animation: winners-fade 0.3s var(--ease);
+}
+
+.winners-body {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 48px);
+}
+
+.winners-head {
+  padding: 28px 28px 18px;
+}
+
+.winners-head h2 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.winners-head p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.winners-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0 28px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--peg) transparent;
+}
+
+.winners-list li {
+  display: grid;
+  grid-template-columns: 60px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 16px;
+  border-radius: 14px;
+  background: var(--ground);
+  animation: result-in 0.5s var(--ease) backwards;
+}
+
+.winners-rank {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.winners-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 18px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.winners-time {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 第一名：金色底，名字放大 */
+.winners-list li:first-child {
+  min-height: 64px;
+  background: var(--gold-wash);
+}
+
+.winners-list li:first-child .winners-rank,
+.winners-list li:first-child .winners-time {
+  color: var(--gold-ink);
+}
+
+.winners-list li:first-child .winners-name {
+  font-size: 24px;
+}
+
+.winners-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 20px 28px 28px;
+}
+
+@keyframes winners-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+}
+
+@keyframes winners-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .winners-head {
+    padding: 22px 20px 14px;
+  }
+
+  .winners-list {
+    padding: 0 20px;
+  }
+
+  .winners-actions {
+    flex-direction: column-reverse;
+    padding: 16px 20px 20px;
+  }
+}
+
+@keyframes result-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ---------- 彈珠台與 HUD ---------- */
+.pinball {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+
+.pinball-canvas {
+  display: block;
+}
+
+.pinball-canvas.interactive {
+  cursor: grab;
+  touch-action: none;
+}
+
+.pinball-canvas.interactive:active {
+  cursor: grabbing;
+}
+
+.hud {
+  position: absolute;
+  z-index: 1;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+/* 左側：本輪狀態與參加名單 */
+.hud-side {
+  top: 20px;
+  left: 20px;
+  bottom: 20px;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 12px 12px;
+  overflow: hidden;
+}
+
+.race-status {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 55%;
+  padding: 0 4px 12px;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--line);
+}
+
+.race-status h1 {
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.race-status h2 {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.race-status .back {
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.hud-side-title {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.hud-side-title em {
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 名單搜尋：輸入即時篩選下方名單 */
+.roster-search {
+  flex: none;
+  min-height: 38px;
+  padding: 8px 12px;
   font-size: 14px;
 }
 
-@media (max-width: 800px) {
+.roster-empty {
+  padding: 0 4px;
+}
+
+.roster {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.roster button {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.roster button:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  background: var(--ground);
+}
+
+.roster button[aria-pressed="true"] {
+  background: var(--gold-wash);
+  font-weight: 700;
+}
+
+.roster .hud-ball {
+  width: 14px;
+  height: 14px;
+}
+
+.roster-rank {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-timer {
+  top: 20px;
+  right: 330px;
+  padding: 10px 16px;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+/* 得獎當下的時間：計時繼續跑，這裡停在分出勝負的那一刻 */
+.hud-decided {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--gold-ink);
+  animation: result-in 0.5s var(--ease);
+}
+
+.hud-decided b {
+  font-weight: 900;
+}
+
+/* 即時名次：最右側一整欄，固定顯示前 20 名 */
+.hud-rank {
+  top: 20px;
+  right: 20px;
+  bottom: 20px;
+  width: 230px;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 14px 10px;
+}
+
+.hud-rank header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.hud-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--live);
+}
+
+.hud-live i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--live);
+  animation: live-pulse 1.4s infinite;
+}
+
+@keyframes live-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.hud-rank ol {
+  overflow-x: hidden;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--peg) transparent;
+}
+
+.hud-rank li {
+  display: grid;
+  grid-template-columns: 24px 14px 1fr;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 26px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.hud-rank li .hud-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-rank li .hud-ball {
+  width: 14px;
+  height: 14px;
+}
+
+/* 目前第一名：台面上方置中的放大名牌，名字沿用彈珠色相（亮度依深淺色調整以維持對比） */
+.hud-leader {
+  top: 20px;
+  left: calc(var(--board-left, 0px) + (100% - var(--board-left, 0px) - var(--board-right, 0px)) / 2);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - var(--board-left, 0px) - var(--board-right, 0px) - 40px);
+  padding: 10px 20px 10px 14px;
+  border-radius: 999px;
+}
+
+/* 名牌最前面的遊戲模式（競速／生存），與第一名標籤以細線分隔 */
+.hud-leader-mode {
+  flex: none;
+  padding-right: 12px;
+  border-right: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hud-leader-tag {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--gold-wash);
+  color: var(--gold-ink);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.hud-leader .hud-ball {
+  flex: none;
+  width: 22px;
+  height: 22px;
+}
+
+.hud-leader-name {
+  min-width: 0;
+  overflow: hidden;
+  color: hsl(var(--hue) 75% var(--leader-l, 36%));
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:root[data-theme="dark"] .hud-leader-name {
+  --leader-l: 64%;
+}
+
+/* 重抽彈珠領先時名字用墨色，不套彈珠色相 */
+.hud-leader-name.redraw {
+  color: var(--ink);
+}
+
+.hud-pos {
+  font-size: 14px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-rank li:first-child .hud-pos {
+  color: var(--gold-ink);
+}
+
+.hud-rank li.arrived .hud-name::after {
+  content: "抵達";
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--ground);
+  font-size: 11px;
+  color: var(--ink-2);
+  vertical-align: 2px;
+}
+
+.hud-ball {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: inset -2px -3px 4px rgb(0 0 0 / 0.2), inset 2px 2px 3px rgb(255 255 255 / 0.5);
+}
+
+.hud-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-3);
+}
+
+.hud-cams {
+  left: var(--hud-left, 20px);
+  bottom: 20px;
+  padding: 4px;
+}
+
+.hud-cams .segmented {
+  padding: 0;
+  background: transparent;
+}
+
+.side-toggle {
+  display: none;
+}
+
+/* 提示泡泡：浮在鏡頭切換列上方 */
+.hud-tip {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 12px);
+  width: max-content;
+  max-width: 320px;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  animation: tip-in 0.25s var(--ease);
+}
+
+.hud-tip::after {
+  content: "";
+  position: absolute;
+  left: 28px;
+  top: 100%;
+  border: 7px solid transparent;
+  border-top-color: var(--ink);
+}
+
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* 得獎名次：名次面板下方、進度軌左邊 */
+.hud-results {
+  top: 250px;
+  right: 94px;
+  width: 180px;
+  max-height: calc(100% - 270px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 12px;
+  overflow-y: auto;
+}
+
+.hud-results h2 {
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.hud-results .results li {
+  grid-template-columns: 44px 1fr;
+  min-height: 38px;
+  padding: 0 10px;
+  font-size: 15px;
+}
+
+.hud-results .results .rank {
+  font-size: 12px;
+}
+
+/* 左側面板裡的得獎名次（本輪狀態下方） */
+.side-results {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 30%;
+  padding: 0 4px 12px;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--line);
+}
+
+.side-results h2 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+.side-results .results li {
+  grid-template-columns: 52px 1fr;
+  min-height: 38px;
+  font-size: 15px;
+}
+
+/* 全場進度軌：起點在上、終點在下，放在即時名次左邊 */
+.hud-mini {
+  top: 20px;
+  right: 262px;
+  bottom: 20px;
+  width: 64px;
+  padding: 10px 4px 8px;
+}
+
+.hud-mini canvas {
+  display: block;
+  border-radius: 6px;
+}
+
+.hud-mini canvas.interactive {
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* 中等寬度：左右欄縮窄 */
+@media (max-width: 1180px) {
   .play {
+    --hud-left: 250px;
+    --board-left: 250px;
+    --board-right: 284px;
+  }
+
+  .hud-results {
+    width: 126px;
+  }
+
+  .hud-mini {
+    right: 212px;
+  }
+
+  .hud-side {
+    width: 214px;
+  }
+
+  .hud-rank {
+    width: 184px;
+  }
+
+  .hud-rank li.arrived .hud-name::after {
+    display: none;
+  }
+
+  .hud-timer {
+    right: 284px;
+  }
+}
+
+/* 窄螢幕：台面占滿，名單改為按鈕展開 */
+@media (max-width: 860px) {
+  .play {
+    height: calc(100dvh - var(--nav-h));
+    min-height: 480px;
+    margin: 0;
+    border-radius: 0;
+    --hud-left: 12px;
+    --board-left: 0px;
+    --board-right: 56px;
+  }
+
+  .hud-side {
+    display: none;
+    z-index: 3;
+    /* 讓出計時器（含下方的得獎時間）的高度 */
+    top: 76px;
+    left: 8px;
+    bottom: 64px;
+    width: min(260px, 75%);
+  }
+
+  .hud-side.open {
+    display: flex;
+  }
+
+  .side-toggle {
+    display: inline-flex;
+  }
+
+  .hud-timer {
+    top: 12px;
+    left: 12px;
+    right: auto;
+    align-items: flex-start;
+    padding: 6px 12px;
+    font-size: 17px;
+  }
+
+  /* 窄螢幕：名次面板縮成上方一塊，前 20 名在面板內捲動 */
+  .hud-rank {
+    top: 12px;
+    right: 12px;
+    bottom: auto;
+    width: 160px;
+    max-height: 40%;
+    padding: 10px 12px 8px;
+  }
+
+  .hud-rank li {
+    height: 24px;
+    font-size: 14px;
+  }
+
+  /* 窄螢幕：第一名名牌移到鏡頭切換列上方，避開計時器與名次面板 */
+  .hud-leader {
+    top: auto;
+    bottom: 64px;
+    left: 50%;
+    max-width: calc(100% - 24px);
+    padding: 6px 14px 6px 10px;
+    gap: 8px;
+  }
+
+  .hud-leader-name {
+    font-size: 19px;
+  }
+
+  .hud-leader-mode {
+    padding-right: 8px;
+  }
+
+  .hud-leader .hud-ball {
+    width: 16px;
+    height: 16px;
+  }
+
+  .hud-results {
+    top: 190px;
+    right: 72px;
+    width: 140px;
+    max-height: calc(100% - 270px);
+    padding: 10px 8px;
+  }
+
+  .hud-mini {
+    top: calc(40% + 20px);
+    right: 12px;
+    bottom: 64px;
+    width: 52px;
+    padding: 8px 2px 6px;
+  }
+
+  .hud-cams {
+    bottom: 12px;
+    right: 12px;
+  }
+
+  .segmented button {
+    padding: 0 8px;
+    font-size: 13px;
+  }
+
+  .hud-tip {
+    max-width: calc(100vw - 48px);
+  }
+}
+
+/* ---------- 抽獎設定：整頁 ---------- */
+.setup .hint {
+  margin-top: -4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+/* 名單 *X 寫錯時的提示 */
+.setup .hint.error {
+  color: var(--danger);
+}
+
+/* 額外機關：每列一個開關，名稱下方是一行說明 */
+.mechs {
+  margin: 0;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  gap: 2px;
+}
+
+.mechs legend {
+  padding: 0 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.mechs .check span {
+  display: grid;
+  color: var(--ink);
+}
+
+.mechs .check small {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.setup {
+  max-width: 1040px;
+}
+
+.setup-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+}
+
+.setup textarea {
+  min-height: 360px;
+}
+
+.setup .start {
+  min-height: 56px;
+  margin-top: 6px;
+  font-size: 18px;
+}
+
+@media (max-width: 860px) {
+  .setup-grid {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 75vh;
-    height: auto;
   }
 
-  .panel {
-    border-right: 0;
-    border-bottom: 1px solid #222c50;
+  .setup textarea {
+    min-height: 200px;
   }
 }
 
-/* 名單管理頁 */
-.lists {
+/* ---------- 名單、紀錄、備份：一般頁面 ---------- */
+.page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-width: 760px;
+  gap: 20px;
+  max-width: 880px;
   margin: 0 auto;
-  padding: 20px;
+  padding: clamp(16px, 4vw, 40px) var(--gutter) 96px;
 }
 
-.lists .editor {
+.page > h1 {
+  font-size: clamp(34px, 5vw, 52px);
+  font-weight: 900;
+  letter-spacing: -0.035em;
+}
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-head h1 {
+  font-size: clamp(34px, 5vw, 52px);
+  font-weight: 900;
+  letter-spacing: -0.035em;
+}
+
+.page .lede {
+  margin: -8px 0 0;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+
+.editor {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid #2c3866;
-  border-radius: 8px;
-  background: #111831;
+  gap: 14px;
+  padding: 24px;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
 }
 
-.lists .actions {
+.editor h2 {
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.editor p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ink-2);
+}
+
+.actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
-.lists .actions a {
-  color: #9fb3ff;
+.actions a:not(.pill) {
   font-size: 14px;
+  font-weight: 700;
 }
 
+/* 群組清單：一個白色容器加細分隔線，不做一列一張卡片 */
 .list-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
 }
 
 .list-rows li {
@@ -246,16 +1623,98 @@ button.secondary {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 12px;
-  border-radius: 8px;
-  background: #18214a;
+  gap: 12px;
+  padding: 18px 24px;
+}
+
+.list-rows li + li {
+  border-top: 1px solid var(--line);
 }
 
 .list-rows .info {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
   font-size: 14px;
-  color: #b8c0e0;
+  color: var(--ink-2);
+}
+
+.list-rows .info strong {
+  font-size: 17px;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+.empty {
+  margin: 0;
+  padding: 48px 24px;
+  border-radius: 20px;
+  background: var(--surface);
+  text-align: center;
+  font-size: 16px;
+  color: var(--ink-2);
+}
+
+/* ---------- 載入骨架：延遲 200ms 淡入，灰條以 1.4s 呼吸提示載入中 ---------- */
+.skeleton-in {
+  animation: skeleton-in 0.3s var(--ease) 0.2s both;
+}
+
+.skeleton-line {
+  display: flex;
+  align-items: center;
+  min-height: 1.7em;
+}
+
+.bone {
+  display: block;
+  max-width: 100%;
+  border-radius: 8px;
+  background: var(--line);
+  animation: skeleton-breathe 1.4s var(--ease) 0.5s infinite alternate;
+}
+
+.bone.round {
+  border-radius: 999px;
+}
+
+/* 白色面板內的骨架改用台面灰，與面板底色拉開但不搶眼 */
+.editor .bone,
+.list-rows .bone {
+  background: var(--ground);
+}
+
+@keyframes skeleton-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes skeleton-breathe {
+  to {
+    opacity: 0.45;
+  }
+}
+
+/* 僅供螢幕閱讀器讀取的文字 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
