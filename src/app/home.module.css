@@ -207,7 +207,8 @@
   padding: clamp(32px, 5vw, 56px);
   border-radius: 28px;
   background: var(--ink);
-  color: #fff;
+  /* 用 token 反白：深色模式下 --ink 是淺色，寫死 #fff 會讓文字消失 */
+  color: var(--surface);
 }
 
 .closing h2 {
@@ -217,7 +218,7 @@
 }
 
 .closing :global(.pill) {
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
 }
 
