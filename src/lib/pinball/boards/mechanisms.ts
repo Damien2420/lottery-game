@@ -11,7 +11,7 @@ const { Bodies } = Matter;
 export const SLOT_H = 420;
 
 /** 吹風區：每幾步換一次風向（約 5 秒） */
-const WIND_PERIOD = 300;
+export const WIND_PERIOD = 300;
 /** 輸送帶：每幾步反轉一次 */
 const BELT_PERIOD = 210;
 /** 翻板：一次循環的步數（翻起 FLIP_UP 步、停 12 步、放下 40 步，其餘靜止） */

@@ -1,9 +1,10 @@
 import type Matter from 'matter-js';
 import type { Sfx } from './audio';
 import { getBoard } from './boards';
-import { beltDir, GATE_H, windDir, windGust } from './boards/mechanisms';
-import type { Board, BoardId } from './boards/types';
+import { beltDir, GATE_H, WIND_PERIOD, windDir, windGust } from './boards/mechanisms';
+import type { Board, BoardId, Spinner } from './boards/types';
 import { MARBLE_R, STEP_MS, WORLD_W } from './physics';
+import * as piece from './pieces';
 import { REDRAW_HUE, Simulation, type SimConfig, type SimMarble } from './simulation';
 
 /** 畫面至少要顯示的世界高度，決定縮放比例 */
@@ -34,31 +35,60 @@ const CLIMAX_HOLD_MS = 1600;
 /** 放大與時間倍率每個畫面（約 16.7 毫秒）趨近目標的比例 */
 const CLIMAX_EASE = 0.12;
 
-/** 淺色畫面配色，與網站設計 token 一致；ink 為對比色、white 為紙色，inkRgb 給半透明疊色用 */
+/**
+ * 淺色畫面配色，與網站設計 token 一致；ink 為對比色、white 為紙色，inkRgb 給半透明疊色用。
+ * 其餘為機關（pieces.ts）的頂面／側面色：側面一律比頂面深、硬邊不模糊。
+ */
 const LIGHT = {
   ground: '#e4e7ec',
   board: '#eceef2',
-  wall: '#3a3f4a',
-  peg: '#c3c9d4',
   ink: '#0b0c0f',
   gold: '#f2a100',
   live: '#ff3b30',
   white: '#ffffff',
   inkRgb: '11 12 15',
+  lightTop: '#ffffff',
+  lightSide: '#aab1bd',
+  darkTop: '#2c3038',
+  darkSide: '#0b0c0f',
+  pegTop: '#ffffff',
+  pegSide: '#b4bbc6',
+  railTop: '#a4abb7',
+  railSide: '#666e7b',
+  railLine: '#d9dde3',
+  print: 'rgb(11 12 15 / 0.045)',
 };
 
-/** 深色畫面配色：台面為深石墨，牆與釘子提亮，對比色與紙色互換 */
+/** 深色畫面配色：台面為深石墨，對比色與紙色互換；機關頂面壓暗但仍比台面亮 */
 const DARK: typeof LIGHT = {
   ground: '#0b0d10',
   board: '#15181d',
-  wall: '#7a8291',
-  peg: '#424956',
   ink: '#eef1f5',
   gold: '#f2a100',
   live: '#ff453a',
   white: '#0e1014',
   inkRgb: '238 241 245',
+  lightTop: '#d9dde3',
+  lightSide: '#6f7784',
+  darkTop: '#4a515e',
+  darkSide: '#0b0c0f',
+  pegTop: '#6f7784',
+  pegSide: '#2a2f37',
+  railTop: '#363c46',
+  railSide: '#0b0c0f',
+  railLine: '#5d6573',
+  print: 'rgb(238 241 245 / 0.05)',
 };
+
+/** 保險桿被撞後亮起、頂面下壓的持續步數（約 0.25 秒） */
+const BUMP_FLASH = 15;
+/** 集結池閘門滑開或關上的動畫步數（約 0.15 秒，物理上閘門是瞬間移開的） */
+const GATE_SLIDE = 9;
+/** 重力井蓄力外觀的過渡時間（秒） */
+const WELL_EASE = 0.4;
+/** 重力井噴發時水流被衝散的時間、冷卻後重新吸回的時間（秒） */
+const WELL_BURST = 0.12;
+const WELL_RETURN = 0.7;
 
 /** 目前使用的配色，每次繪製前依頁面的深淺色模式更新 */
 let C = LIGHT;
@@ -185,6 +215,14 @@ export class Game {
   private readonly font: string;
   /** 彈珠圖片快取，鍵為色相 */
   private sprites = new Map<number, HTMLCanvasElement>();
+  /** 以下為只影響外觀的繪製狀態，換台面時重設：保險桿最近一次被撞的步數 */
+  private bumperHit = new Map<Matter.Body, number>();
+  /** 各集結池閘門目前開或關，以及切換時的步數（滑門動畫用） */
+  private gateAnim: { open: boolean; at: number }[] = [];
+  /** 各彈射點所在斜坡的角度（第一次繪製時由台面物件算出） */
+  private padSlopes: number[] = [];
+  /** 各重力井水流的相位、蓄力外觀程度與可見程度（逐格累加，速度與狀態改變時不跳動） */
+  private wellAnim: { step: number; flow: number; spin: number; k: number; vis: number }[] = [];
 
   /**
    * @param canvas 繪製用的畫布，尺寸跟隨其父元素
@@ -211,7 +249,38 @@ export class Game {
   showBoard(boardId: BoardId): void {
     this.stop();
     this.board = getBoard(boardId)?.build() ?? null;
+    this.resetDecor();
     this.camY = this.freeY = 0;
+  }
+
+  /** 換台面時清掉只影響外觀的繪製狀態 */
+  private resetDecor(): void {
+    this.bumperHit.clear();
+    this.gateAnim = [];
+    this.wellAnim = [];
+    this.padSlopes = [];
+  }
+
+  /**
+   * 彈射點所在斜坡的角度：找正下方最近、水平範圍涵蓋彈射點的牆，取其角度（收斂到 ±90 度內）。
+   * @param board 台面
+   * @param i 彈射點索引
+   * @returns 弧度；找不到牆時為 0（水平）
+   */
+  private padSlope(board: Board, i: number): number {
+    const cached = this.padSlopes[i];
+    if (cached !== undefined) return cached;
+    const p = board.mechs.pads[i];
+    let best: Matter.Body | null = null;
+    for (const b of board.statics) {
+      if (b.label !== 'wall' || b.bounds.min.x > p.x || b.bounds.max.x < p.x || b.position.y < p.y - 40) continue;
+      if (!best || Math.abs(b.position.y - p.y) < Math.abs(best.position.y - p.y)) best = b;
+    }
+    let ang = best ? best.angle % Math.PI : 0;
+    if (ang > Math.PI / 2) ang -= Math.PI;
+    if (ang <= -Math.PI / 2) ang += Math.PI;
+    this.padSlopes[i] = ang;
+    return ang;
   }
 
   /**
@@ -227,6 +296,7 @@ export class Game {
     }
     this.sim = new Simulation(cfg);
     this.board = this.sim.board;
+    this.resetDecor();
     this.winnerCount = cfg.winnerCount;
     this.doneFired = false;
     this.doneStep = 0;
@@ -625,9 +695,12 @@ export class Game {
 
     const step = this.sim?.stepCount ?? 0;
     this.drawMechsUnder(board, top, bottom, step);
-    for (const b of board.statics) if (b.label !== 'frame' && visible(b)) this.drawStatic(b);
+    for (const b of board.statics) if (b.label !== 'frame' && visible(b)) this.drawStatic(b, step);
     this.drawMechsOver(board, top, bottom, step);
-    for (const s of board.spinners) if (visible(s.body)) this.drawSpinner(s.body);
+    // 集結池的延長臂（白色伸縮段）先畫，主臂疊在上面，只露出臂尖
+    const ext = new Set(board.mechs.pools.flatMap((p) => p.arms));
+    for (const s of board.spinners) if (ext.has(s.body) && visible(s.body)) this.drawSpinner(s, true);
+    for (const s of board.spinners) if (!ext.has(s.body) && visible(s.body)) this.drawSpinner(s, false);
 
     const sim = this.sim;
     if (sim) {
@@ -663,28 +736,78 @@ export class Game {
     ctx.restore();
   }
 
-  /** 牆、斜坡、釘子與保險桿 */
-  private drawStatic(b: Matter.Body): void {
+  /**
+   * 牆與斜坡、釘子、保險桿、翻板、重力井核心（輸送帶與集結池閘門另外畫）。
+   * @param b 靜態剛體
+   * @param step 物理步數（保險桿撞擊閃光用）
+   */
+  private drawStatic(b: Matter.Body, step: number): void {
     const { ctx } = this;
-    if (b.label === 'bumper' && b.circleRadius) {
-      ctx.beginPath();
-      ctx.arc(b.position.x, b.position.y, b.circleRadius, 0, Math.PI * 2);
-      ctx.fillStyle = C.white;
-      ctx.fill();
-      ctx.lineWidth = 5;
-      ctx.strokeStyle = C.gold;
-      ctx.stroke();
-      return;
+    const { x, y } = b.position;
+    switch (b.label) {
+      case 'bumper':
+        piece.bumper(ctx, C, x, y, b.circleRadius ?? 18, this.bumperFlash(b, step));
+        return;
+      case 'peg':
+        piece.peg(ctx, C, x, y, b.circleRadius ?? 5);
+        return;
+      case 'core':
+        piece.core(ctx, C, x, y, b.circleRadius ?? 16);
+        return;
+      case 'belt':
+      case 'gate':
+        return;
+      case 'paddle': {
+        const [len, th] = this.rectSize(b);
+        // 未啟用翻板時保留為固定斜坡，不畫轉軸
+        const active = this.board?.mechs.flippers.some((f) => f.body === b) ?? false;
+        piece.plank(ctx, C, x, y, b.angle, len, th, active);
+        return;
+      }
+      default: {
+        const [len, th] = this.rectSize(b);
+        piece.rail(ctx, C, x, y, b.angle, len, th);
+      }
     }
-    // 會動的機關（翻板、集結池閘門）與重力井核心用墨黑，和固定的牆面區分
-    const moving = b.label === 'paddle' || b.label === 'gate' || b.label === 'core';
-    ctx.fillStyle = b.label === 'peg' ? C.peg : moving ? C.ink : C.wall;
-    this.tracePath(b);
-    ctx.fill();
   }
 
   /**
-   * 機關的底層圖案（畫在台面物件之下）：吹風區的淡藍底與流線、重力井的轉動虛線圈、彈射點的金色圈。
+   * 矩形剛體的長與厚（頂點依 matter-js 順序：0→1 沿寬、1→2 沿高）。
+   * @param b 矩形剛體
+   * @returns [長, 厚]
+   */
+  private rectSize(b: Matter.Body): [number, number] {
+    const [v0, v1, v2] = b.vertices;
+    return [Math.hypot(v1.x - v0.x, v1.y - v0.y), Math.hypot(v2.x - v1.x, v2.y - v1.y)];
+  }
+
+  /**
+   * 保險桿的撞擊閃光：有彈珠貼著保險桿就記下步數，之後 BUMP_FLASH 步內由 1 衰減到 0。
+   * 只在畫面端判斷，不影響模擬。
+   * @param b 保險桿
+   * @param step 物理步數
+   * @returns 0 到 1
+   */
+  private bumperFlash(b: Matter.Body, step: number): number {
+    const sim = this.sim;
+    if (!sim) return 0;
+    const reach = (b.circleRadius ?? 18) + MARBLE_R + 1.5;
+    for (const m of sim.marbles) {
+      if (m.finished) continue;
+      const dx = m.body.position.x - b.position.x;
+      const dy = m.body.position.y - b.position.y;
+      if (dx * dx + dy * dy <= reach * reach) {
+        this.bumperHit.set(b, step);
+        break;
+      }
+    }
+    const hit = this.bumperHit.get(b);
+    return hit === undefined ? 0 : Math.max(0, 1 - (step - hit) / BUMP_FLASH);
+  }
+
+  /**
+   * 機關的底層（畫在台面物件之下）：印在台面上的吹風區、重力井、彈射點，以及集結池閘門
+   * （閘門先畫，滑開時兩扇門收到斜牆底下）。
    * @param board 台面
    * @param top 可視範圍頂端
    * @param bottom 可視範圍底端
@@ -694,158 +817,80 @@ export class Game {
     const { ctx } = this;
     for (const w of board.mechs.winds) {
       if (w.y + w.h < top || w.y > bottom) continue;
-      const dir = windDir(step, w.phase);
-      const k = windGust(step, w.phase);
-      ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(w.x, w.y, w.w, w.h, 18);
-      ctx.fillStyle = 'rgb(55 138 221 / 0.1)';
-      ctx.fill();
-      ctx.clip();
-      ctx.strokeStyle = `rgb(24 95 165 / ${(0.25 + 0.35 * k).toFixed(2)})`;
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = 'round';
-      ctx.setLineDash([26, 22]);
-      ctx.lineDashOffset = -step * 3 * k;
-      for (let i = -6; i < 14; i++) {
-        const x0 = w.x + i * 60;
-        ctx.beginPath();
-        ctx.moveTo(x0, w.y + w.h);
-        ctx.lineTo(x0 + dir * w.h * 0.85, w.y);
-        ctx.stroke();
-      }
-      ctx.restore();
+      const ts = ((step + w.phase) % WIND_PERIOD) * STEP_MS;
+      piece.windZone(ctx, C, w, ts, WIND_PERIOD * STEP_MS, windDir(step, w.phase), windGust(step, w.phase));
     }
     board.mechs.wells.forEach((w, i) => {
-      if (w.y + w.r < top || w.y - w.r > bottom) return;
-      // 蓄力中：虛線圈轉得越來越快並逐漸染成橘色；噴發後：一圈橘色衝擊波往外擴散
+      // 水流相位逐格累加：蓄力時只小幅加速，外觀程度在 WELL_EASE 秒內平順過渡
       const { charge, cooling } = this.sim?.wellPhase(i) ?? { charge: 0, cooling: 0 };
-      ctx.save();
-      if (charge > 0) {
-        ctx.beginPath();
-        ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgb(242 161 0 / ${(0.05 + 0.15 * charge).toFixed(3)})`;
-        ctx.fill();
-      }
-      ctx.strokeStyle = charge > 0 ? `rgb(242 161 0 / ${(0.35 + 0.5 * charge).toFixed(3)})` : `rgb(${C.inkRgb} / 0.22)`;
-      ctx.lineWidth = 2;
-      ctx.setLineDash([10, 10]);
-      [1, 0.68, 0.38].forEach((f, j) => {
-        ctx.lineDashOffset = -step * (1.2 + j * 0.8) * (1 + charge * 4);
-        ctx.beginPath();
-        ctx.arc(w.x, w.y, w.r * f, 0, Math.PI * 2);
-        ctx.stroke();
-      });
-      if (cooling > 0) {
-        ctx.setLineDash([]);
-        ctx.lineWidth = 6 * cooling;
-        ctx.strokeStyle = `rgb(242 161 0 / ${cooling.toFixed(3)})`;
-        ctx.beginPath();
-        ctx.arc(w.x, w.y, w.r * (1.4 - 0.9 * cooling), 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      ctx.restore();
+      const st = (this.wellAnim[i] ??= { step, flow: 0, spin: 0, k: 0, vis: 1 });
+      const dt = Math.max(0, Math.min(5, step - st.step)) * (STEP_MS / 1000);
+      st.step = step;
+      st.k += ((charge > 0 ? 1 : 0) - st.k) * Math.min(1, dt / WELL_EASE);
+      // 噴發時水流在 WELL_BURST 秒內被衝散，冷卻結束後在 WELL_RETURN 秒內重新吸回
+      const target = cooling > 0 ? 0 : 1;
+      st.vis += (target - st.vis) * Math.min(1, dt / (target < st.vis ? WELL_BURST : WELL_RETURN));
+      st.flow += dt * (0.16 + 0.08 * st.k);
+      st.spin += dt * (0.7 + 0.35 * st.k);
+      if (w.y + w.r * 1.4 < top || w.y - w.r * 1.4 > bottom) return;
+      piece.wellFlow(ctx, C, w, w.r * 0.17, st.k, st.flow, st.spin, st.vis);
+      if (cooling > 0) piece.shockwave(ctx, w, cooling);
     });
-    // 彈射點：金色粗圈加朝上的小箭頭，看得出會把彈珠往上彈
     // 只剩最後一顆彈珠時彈射點停用，不再畫出
     if (!this.sim?.padsOff()) board.mechs.pads.forEach((p, i) => {
       if (p.y + p.r < top || p.y - p.r > bottom) return;
-      // 彈出彈珠的瞬間放大變亮，再慢慢恢復
-      const charge = this.sim?.padFlash(i) ?? 0;
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r * (1 + 0.25 * charge), 0, Math.PI * 2);
-      ctx.fillStyle = `rgb(242 161 0 / ${(0.14 + 0.5 * charge).toFixed(3)})`;
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = C.gold;
-      ctx.setLineDash([6, 5]);
-      ctx.lineDashOffset = -step * 0.8;
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.moveTo(p.x - 6, p.y + 3);
-      ctx.lineTo(p.x, p.y - 4);
-      ctx.lineTo(p.x + 6, p.y + 3);
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-      ctx.restore();
+      piece.padPrint(ctx, C, p, this.sim?.padFlash(i) ?? 0, this.padSlope(board, i));
+    });
+    // 集結池雙開閘門：燈號依開閘進度亮起，開閘時兩扇門往左右滑開
+    board.mechs.pools.forEach((p, i) => {
+      if (p.closed.y + GATE_H < top || p.closed.y - GATE_H > bottom) return;
+      const { open, fill } = this.sim?.poolPhase(i) ?? { open: false, fill: 0 };
+      const st = (this.gateAnim[i] ??= { open, at: -GATE_SLIDE });
+      if (st.open !== open) {
+        st.open = open;
+        st.at = step;
+      }
+      const k = Math.min(1, Math.max(0, (step - st.at) / GATE_SLIDE));
+      const lit = open ? 6 : Math.floor(fill * 6 + 1e-6);
+      const [w] = this.rectSize(p.gate);
+      piece.gateDoors(ctx, C, p.closed.x, p.closed.y, w, GATE_H, lit, open ? k : 1 - k);
     });
   }
 
   /**
-   * 機關的上層標示：輸送帶帶面上的流動箭頭、集結池閘門上的開閘進度條。
+   * 機關的上層：輸送帶（帶身、流動的履帶紋與滾輪）。
    * @param board 台面
    * @param top 可視範圍頂端
    * @param bottom 可視範圍底端
    * @param step 物理步數
    */
   private drawMechsOver(board: Board, top: number, bottom: number, step: number): void {
-    const { ctx } = this;
     for (const t of board.mechs.belts) {
       if (t.y + 40 < top || t.y - 40 > bottom) continue;
-      const dir = beltDir(step, t.phase);
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(t.x, t.y, t.w, t.h);
-      ctx.clip();
-      ctx.strokeStyle = 'rgb(255 255 255 / 0.85)';
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      const off = ((step * 1.6) % 30) * dir;
-      for (let x = t.x - 30; x < t.x + t.w + 30; x += 30) {
-        const cx = x + off;
-        ctx.beginPath();
-        ctx.moveTo(cx - 3 * dir, t.y + 2);
-        ctx.lineTo(cx + 3 * dir, t.y + t.h / 2);
-        ctx.lineTo(cx - 3 * dir, t.y + t.h - 2);
-        ctx.stroke();
+      piece.belt(this.ctx, C, t.x, t.y, t.w, t.h, beltDir(step, t.phase), step);
+    }
+  }
+
+  /**
+   * 旋轉擋板：墨黑長條加金色轉軸；集結池延長臂畫成白色伸縮段；終點的勺形攪拌棒畫成勺形轉子。
+   * @param s 擋板
+   * @param ext 是否為集結池的延長臂
+   */
+  private drawSpinner(s: Spinner, ext: boolean): void {
+    const { ctx } = this;
+    const b = s.body;
+    const { x, y } = b.position;
+    if (b.parts.length > 1) {
+      // 複合剛體（勺形攪拌棒）：最外緣半徑由各段頂點算出，parts[0] 是父剛體本身
+      let reach = 0;
+      for (const part of b.parts.slice(1)) {
+        for (const v of part.vertices) reach = Math.max(reach, Math.hypot(v.x - x, v.y - y));
       }
-      ctx.restore();
+      piece.scoopRotor(ctx, C, x, y, reach, b.angle, s.speed >= 0 ? 1 : -1);
+      return;
     }
-    // 集結池：閘門關著時在閘門上方畫金色進度條，滿了就開閘
-    board.mechs.pools.forEach((p, i) => {
-      if (p.closed.y + GATE_H < top || p.closed.y - GATE_H > bottom) return;
-      const { open, fill } = this.sim?.poolPhase(i) ?? { open: false, fill: 0 };
-      if (open) return;
-      const w = 90;
-      // 進度條在閘門上緣往上 10
-      const barY = p.closed.y - GATE_H / 2 - 10;
-      ctx.fillStyle = `rgb(${C.inkRgb} / 0.15)`;
-      ctx.fillRect(p.closed.x - w / 2, barY, w, 5);
-      ctx.fillStyle = C.gold;
-      ctx.fillRect(p.closed.x - w / 2, barY, w * fill, 5);
-    });
-  }
-
-  /** 旋轉擋板：墨黑圓角條加金色轉軸 */
-  private drawSpinner(b: Matter.Body): void {
-    const { ctx } = this;
-    ctx.fillStyle = C.ink;
-    // 複合剛體（勺形攪拌棒）逐段畫出，parts[0] 是父剛體本身
-    for (const part of b.parts.length > 1 ? b.parts.slice(1) : [b]) {
-      this.tracePath(part);
-      ctx.fill();
-    }
-    ctx.beginPath();
-    ctx.arc(b.position.x, b.position.y, 4.5, 0, Math.PI * 2);
-    ctx.fillStyle = C.gold;
-    ctx.fill();
-  }
-
-  /** 依剛體外形描出路徑（圓形畫圓、其餘依頂點畫多邊形） */
-  private tracePath(b: Matter.Body): void {
-    const { ctx } = this;
-    ctx.beginPath();
-    if (b.circleRadius) {
-      ctx.arc(b.position.x, b.position.y, b.circleRadius, 0, Math.PI * 2);
-    } else {
-      ctx.moveTo(b.vertices[0].x, b.vertices[0].y);
-      for (const v of b.vertices.slice(1)) ctx.lineTo(v.x, v.y);
-      ctx.closePath();
-    }
+    const [len, th] = this.rectSize(b);
+    piece.spinnerBar(ctx, C, x, y, b.angle, len, th, ext);
   }
 
   /** 以快取的立體玻璃珠圖片繪製彈珠 */
