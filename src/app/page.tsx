@@ -72,15 +72,15 @@ export default function Home(): React.JSX.Element {
             抽獎彈珠台，
             <br />
             <span>
-              每顆彈珠，
+              讓彈珠滾一場，
               <br />
-              都是一位參加者。
+              決定誰得獎。
             </span>
           </h1>
         </div>
         <div className={styles.heroSide}>
           <p className={styles.lead}>
-            不論是尾牙抽獎、社團活動或直播抽獎，貼上名單、按下開始，就能讓彈珠決定得獎者，過程公開透明、結果可重播。
+            不論是尾牙抽獎、社團活動或直播抽獎，貼上名單、按下開始，看彈珠一路滾到終點，過程公開透明、結果可重播。
           </p>
           <Link href="/play" className="pill">
             開始抽獎
